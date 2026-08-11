@@ -1,0 +1,16 @@
+# brainstorming 視覺草稿（本機用，不入庫）
+.superpowers/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# uv
+.python-version
+
+# macOS
+.DS_Store
