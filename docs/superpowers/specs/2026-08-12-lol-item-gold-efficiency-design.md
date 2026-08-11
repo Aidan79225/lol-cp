@@ -21,7 +21,17 @@
 | 套件管理 | `uv` |
 | GUI | PySide6 |
 | 架構 | Clean Architecture |
-| Python | 3.12（`pyproject.toml` 釘住） |
+| Python | **3.13**（`pyproject.toml` 釘住 `>=3.13,<3.14`） |
+
+**版本選擇依據**（`uv lock` 實測，非推測）：
+
+| 套件 | 版本 | 限制 |
+|---|---|---|
+| PySide6 | 6.11.1 | `requires_python = ">=3.10,<3.15"`；wheel 為 `cp310-abi3-macosx_13_0_universal2`（穩定 ABI，不需編譯 Qt） |
+| numpy | 2.5.2 | arm64 wheel 涵蓋 cp312–cp315 |
+| scipy | 1.18.0 | arm64 wheel 涵蓋 cp312–cp314，**無 cp315** |
+
+3.12 / 3.13 / 3.14 的 `uv lock` 解析結果完全相同。**3.15 出局**（PySide6 上限 + scipy 無 wheel）。選 3.13 而非 3.14 是因為後者已是 PySide6 支援天花板，無升級空間；選 3.13 而非 3.12 是因為解析結果既然相同，沒有落後兩版的理由。
 
 ### 1.2 明確非目標（v1 不做）
 
@@ -41,12 +51,14 @@
 
 ## 2. 環境前置作業
 
-本機目前**兩者皆未安裝**：
-
 ```bash
-brew install uv      # 必要。uv 自帶 Python 管理，本機 3.9.6 對 PySide6 過舊
-brew install node    # 選用。僅 brainstorming 瀏覽器版需要
+brew install uv      # ✅ 已安裝（uv 0.12.3）
+brew install node    # 選用，尚未安裝。僅 brainstorming 瀏覽器版需要
 ```
+
+Python 由 uv 管理（`uv python install 3.13`），不使用系統或 pyenv 的 Python。
+
+> **已知環境干擾**：本機 pyenv shim（`~/.pyenv/shims/python`）會讓 `uv pip install --python-version` 之類的指令探測失敗（`pyenv: python: command not found`）。在 uv 專案內操作（`uv sync` / `uv run` / `uv lock`）不受影響，因為 uv 使用專案自己的 `.venv`。實作時一律用專案內指令，不要用 `uv pip --python-version`。
 
 ---
 
@@ -157,7 +169,7 @@ presentation ──→ application ──→ domain
 
 ```
 lol-cp/
-├── pyproject.toml                  # uv, requires-python = ">=3.12"
+├── pyproject.toml                  # uv, requires-python = ">=3.13,<3.14"
 ├── src/lolcp/
 │   ├── domain/                     # 純邏輯，零 I/O
 │   │   ├── entities.py             # Item, Champion
