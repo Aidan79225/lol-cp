@@ -74,7 +74,7 @@ https://ddragon.leagueoflegends.com/cdn/<version>/data/<locale>/item.json
 https://ddragon.leagueoflegends.com/cdn/<version>/data/<locale>/champion.json
 ```
 
-免 API key。`16.15.1` 共 868 件裝備，其中**召喚峽谷可購買 248 件**（`maps["11"] == true` ∧ `gold.purchasable` ∧ `gold.total > 0`）。
+免 API key。`16.15.1` 共 868 件裝備。召喚峽谷可購買的篩選條件為 `maps["11"] == true` ∧ `gold.purchasable` ∧ `gold.total > 0` ∧ **`int(id) < 10000`**（見 §3.6），符合者 **212 件**。
 
 **可靠欄位**：中文名稱、圖示、`gold.total`、`gold.sell`、`maps`、`from`/`into` 合成樹、`stats.FlatMPPoolMod`。
 
@@ -105,7 +105,7 @@ https://ddragon.leagueoflegends.com/cdn/<version>/data/<locale>/champion.json
 https://raw.communitydragon.org/latest/game/items.cdtb.bin.json      # 15.8 MB
 ```
 
-遊戲真正的數值檔，key 形如 `Items/3031`。**24 種屬性欄位**（Data Dragon 的兩倍），涵蓋 SR 可購買裝備的 **92%（229/248）**。
+遊戲真正的數值檔，key 形如 `Items/3031`。**24 種屬性欄位**（Data Dragon 的兩倍），涵蓋標準 ID 的 SR 可購買裝備 **93%（198/212）**。
 
 實例（`Items/3031`）：
 ```
@@ -132,7 +132,23 @@ mFlatCritDamageMod:     0.30    ← Data Dragon 漏掉的
 
 零分歧可直接作為測試斷言：日後出現分歧即 schema 漂移警報。
 
-### 3.5 英雄資料
+### 3.5 裝備 ID 變體污染（必須過濾）
+
+`maps["11"]` 為 `true` 的裝備中，有 **36 件使用非標準 ID**：前綴 `32`（21 件）與 `66`（15 件），各自包裹一個標準 ID（`323070` = `32` + `3070` 女神之淚）。這些是其他遊戲模式的變體，與 §3.6 的 `Jade_` 英雄同性質。
+
+**它們必須被過濾，理由不只是重複計數**：
+
+- **23 件是純重複** — 標準版也在集合內（`3003` 大天使之杖 與 `323003` 同名同價 2900g）
+- **部分變體價格不同** — `2065` 蘇瑞亞的戰歌 2200g vs `322065` 2600g。同樣屬性、不同售價，在 NNLS 的聯立矩陣裡是**互相矛盾的方程式**，會實際扭曲解出的單價
+- **錨定裝備也有變體** — 長劍 `1036`(350g/10AD) 另有 `771036`(400g/10AD)；治療寶珠 `1006`(300g) 另有 `771006`(180g)，且後者用的是**不同的屬性欄位**（`mFlatHPRegenMod` 而非 `mPercentBaseHPRegenMod`）
+
+最後一點是關鍵：**錨定裝備一律以數值 ID 查找，絕不以名稱查找。** 用名稱查會拿到變體，單價全錯且不會報錯。
+
+**過濾規則**：`int(id) < 10000`。過濾掉的件數須記錄（目前 36），數量劇變時應調查。
+
+> **與英雄不同：裝備名稱不唯一，不可斷言唯一。** 標準 ID 內仍有 3 組同名裝備——熾爪幼犬（`1101`/`1107`）、馭風幼狐（`1102`/`1106`）、重踏幼螈（`1103`/`1105`）——這些是叢林寵物的正常變體，兩者皆為合法遊戲內容，必須保留。
+
+### 3.6 英雄資料
 
 `champion.json` 共 **233 個條目，但僅 173 隻真英雄**。60 個 `Jade_` 前綴變體（numeric id ≥ 60000）為其他模式資料，必須濾除，否則視角選單會出現重複英雄（凱爾即在重複名單內）。
 
@@ -241,6 +257,26 @@ bin:  mFlatCritChanceMod     = 0.25    ← 分數
 
 **不變量：轉換只存在於 mapping 層；domain 內的數值一律已正規化。** 須有測試守護。
 
+**哪些欄位要 ×100 不能靠前綴判斷。** `mFlatCritDamageMod = 0.30` 帶 `Flat` 前綴卻是分數；欄位名完全不可靠。下表由實際值域推定（`16.15.1` 全裝備掃描），**須寫成明確常數集合，不得用字串前綴推導**：
+
+| 需 ×100（分數） | 不需轉換（絕對值） |
+|---|---|
+| `mFlatCritChanceMod` (0.08–0.5) | `mFlatPhysicalDamageMod` (4–150) |
+| `mFlatCritDamageMod` (0.3–0.45) ← **陷阱** | `mFlatMagicDamageMod` (7–300) |
+| `mPercentAttackSpeedMod` (0.1–0.7) | `mFlatHPPoolMod` (25–1100) |
+| `mPercentBaseHPRegenMod` (0.25–2.0) | `mFlatArmorMod` (8–100) |
+| `mPercentLifeStealMod` (0.05–0.3) | `mFlatSpellBlockMod` (8–100) |
+| `mPercentMovementSpeedMod` (0.04–0.15) | `mFlatMovementSpeedMod` (25–100) |
+| `mPercentHealingAmountMod` (0.08–0.2) | `mAbilityHasteMod` (5–40) |
+| `mPercentTenacityItemMod` (0.2–0.3) | `mFlatHPRegenMod` (0.8–4) |
+| `mPercentSlowResistMod` (0.15–0.4) | `mFlatMagicPenetrationMod` (10–20) |
+| `mPercentMagicPenetrationMod` (0.08–0.4) | `MANA`（來自 Data Dragon，絕對值） |
+| `mPercentArmorPenetrationMod` (0.08–0.4) | |
+
+上列 21 項即 §3.1 所述「SR 出現的 21 種屬性」。
+
+**SR 未出現但需納入 `StatKey` 的欄位**（供未知欄位偵測用，映射存在但實務上不會出現）：`mPercentCooldownMod`（值為**負數** −0.2～0.01）、`mFlatArmorPenetrationMod`（值域 0.05–22，**語意混雜**，僅 4 件非 SR 裝備，遇到須警告）、`mFlatAttackRangeMod`、`mPercentMultiplicativeAttackSpeedMod`。
+
 ### 5.2 屬性合併規則
 
 ```python
@@ -271,9 +307,9 @@ class PriceDeriver(Protocol):
 | 魔法抗性 | 抗魔斗篷 (1033) 400g / 20 | 20.0 |
 | 暴擊率 | 靈巧披風 (1018) 600g / 15% | 40.0 /1% |
 | 攻擊速度 | 短劍 (1042) 250g / 10% | 25.0 /1% |
-| 技能加速 | 發光結晶 250g / 5 | 50.0 |
+| 技能加速 | 發光結晶 (2022) 250g / 5 | 50.0 |
 | 移動速度 | 鞋子 (1001) 300g / 25 | 12.0 |
-| 基礎生命回復 | 治療寶珠 300g / 100% | 3.0 /1% |
+| 基礎生命回復 | 治療寶珠 (1006) 300g / 100% | 3.0 /1% |
 
 > **正規化陷阱（實際踩過）**：`mPercentBaseHPRegenMod` 的原始值是分數（治療寶珠 `1.0` ↔ 描述「100% 基礎生命回復」、星體抗力 `0.75` ↔「75%」）。若拿未正規化的 `1.0` 去除 300g，會得到 `300.0` 的單價；套上正規化後的 `100.0` 數量就放大 100 倍。**錨定表的單價必須與正規化後的單位一致。** 此案例須成為明確測試（見 §10.2）。
 
@@ -294,8 +330,8 @@ class PriceDeriver(Protocol):
 
 ```python
 # 解 A·x ≈ b，x ≥ 0
-A = 229 × 21   屬性矩陣（已正規化）
-b = 229        各裝備總價
+A = 198 × 21   屬性矩陣（已正規化，僅標準 ID）
+b = 198        各裝備總價
 x = scipy.optimize.nnls(A, b)
 ```
 
@@ -603,8 +639,16 @@ armor_pen_percent = 0.4
 中婭沙漏     3250g →   9.2%   殘差 +2950g   未定價 0  遮罩 1（法術強度）
 
 # 資料集不變量
-SR 可購買裝備 = 248    真英雄 = 173    bin↔DD 衝突 = 0
-partype != "Mana" = 33    Jade_ 變體 = 60    SR 屬性種類 = 21（11 可定價 / 10 未定價）
+SR 可購買裝備（標準 ID）= 212      被過濾的變體 ID = 36
+其中有結構化屬性        = 198      → NNLS 矩陣 198 × 21
+SR 屬性種類 = 21（11 可定價 / 10 未定價）
+真英雄 = 173              Jade_ 變體 = 60
+partype != "Mana" = 33    bin↔DD 衝突 = 0
+
+# 錨定裝備 ID（必須以 ID 查找，不可以名稱查找 — 見 §3.5）
+長劍 1036   增幅典籍 1052   紅水晶 1028   藍水晶 1027   布甲 1029
+抗魔斗篷 1033   靈巧披風 1018   短劍 1042   發光結晶 2022
+鞋子 1001   治療寶珠 1006
 ```
 
 達瑞文視角的四筆驗證了 RoleDefaults 套用、遮罩與未定價分離、以及「英雄視角不會一律壓低數字」這個性質（前兩筆與全域相同）。
