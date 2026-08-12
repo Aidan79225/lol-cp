@@ -74,21 +74,21 @@ https://ddragon.leagueoflegends.com/cdn/<version>/data/<locale>/item.json
 https://ddragon.leagueoflegends.com/cdn/<version>/data/<locale>/champion.json
 ```
 
-免 API key。`16.15.1` 共 868 件裝備。召喚峽谷可購買的篩選條件為 `maps["11"] == true` ∧ `gold.purchasable` ∧ `gold.total > 0` ∧ **`int(id) < 10000`**（見 §3.6），符合者 **212 件**。
+免 API key。`16.15.1` 共 868 件裝備。召喚峽谷可購買的篩選條件為 `maps["11"] == true` ∧ `gold.purchasable` ∧ `gold.total > 0` ∧ **`int(id) < 10000`**（見 §3.5），符合者 **212 件**。
 
 **可靠欄位**：中文名稱、圖示、`gold.total`、`gold.sell`、`maps`、`from`/`into` 合成樹、`stats.FlatMPPoolMod`。
 
-**缺陷**：`stats` 的**欄位種類**不足，只有 12 種，缺整批現代屬性。並非「大量空白」（僅 8%，20/248 完全空白），而是 schema 本身不完整：
+**缺陷**：`stats` 的**欄位種類**不足，只有 12 種，缺整批現代屬性。並非「大量空白」（僅 8%，18/212 完全空白），而是 schema 本身不完整：
 
 | Data Dragon 缺少的屬性 | 影響 SR 裝備數 |
 |---|---|
-| 技能加速 | 90 |
-| 魔法穿透 | 9 |
-| 韌性 | 8 |
+| 技能加速 | 69 |
+| 魔法穿透 | 8 |
+| 韌性 | 7 |
 | 物理穿透 | 4 |
 | 暴擊傷害 | 3 |
 
-合計 **107/248（43%）** 裝備會被系統性低估。
+合計 **86/212（41%）** 裝備會被系統性低估。
 
 實例（無盡之刃 3031）：`description` 寫「75 物攻 / 25% 暴擊率 / **30% 暴擊傷害**」，但 `stats` 只有 `FlatPhysicalDamageMod: 75` 與 `FlatCritChanceMod: 0.25`，暴擊傷害不存在。
 
@@ -597,7 +597,8 @@ armor_pen_percent = 0.4
 | item id 僅在單邊出現 | 記錄雙向計數，診斷面板可查 |
 | 錨定裝備消失 | **啟動時大聲失敗**：「錨定裝備 1036 不存在於 \<version\>」。藍水晶曾被移除，此事遲早發生 |
 | 英雄設定檔含未知屬性名 | 明確報錯並列出合法選項。打錯字若靜默忽略，使用者會誤以為權重生效 |
-| 英雄名稱重複 | 斷言失敗（§3.5），不靜默去重 |
+| 英雄名稱重複 | 斷言失敗（§3.6），不靜默去重 |
+| 裝備使用非標準 ID | 過濾並記錄件數（§3.5）。**裝備名稱不唯一，不可斷言唯一** |
 | 網路失敗 | 見 §6.2 離線降級 |
 
 ### 9.2 最小平方法的信賴度
@@ -692,7 +693,7 @@ AD 1.0   AP 1.0   暴擊 1.0   攻速 1.0   生命 0.6   護甲 0.5
 |---|---|---|
 | 1 | CP值 = 從基礎裝備反推單價 | 改版後單價自動跟上，不需手動維護常數表 |
 | 2 | 兩種定價法並列顯示 | 差異大者 = 被動價值高或屬性被低估，本身即分析入口 |
-| 3 | 屬性來源 = CommunityDragon bin | Data Dragon 缺 43% 裝備的屬性；Meraki 已死；CDragon client 無屬性 |
+| 3 | 屬性來源 = CommunityDragon bin | Data Dragon 缺 41% 裝備的屬性；Meraki 已死；CDragon client 無屬性 |
 | 4 | 法力來自 Data Dragon | bin 完全不存法力欄位 |
 | 5 | 英雄層 = Level 1，float 權重 | 與 Level 2 同型，日後加 UI 不動 domain |
 | 6 | 權重三層解析 | 新增英雄零成本；覆寫僅寫差異 |
