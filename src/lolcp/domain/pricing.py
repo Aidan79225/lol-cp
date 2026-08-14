@@ -115,3 +115,63 @@ class CanonicalDeriver:
                 f"{entry.stat.name} 數量為 0，無法作為分母。"
             )
         return anchor.total_gold / amount
+
+
+class LeastSquaresDeriver:
+    """把所有裝備當聯立方程式，一次解出全部屬性的單價。
+
+    解 A·x ≈ b，x ≥ 0：
+      A[i][j] = 裝備 i 的屬性 j 數量（已正規化）
+      b[i]    = 裝備 i 的總價
+
+    用非負最小平方（NNLS）而非普通最小平方，因為屬性單價不該為負。
+
+    優點：所有出現過的屬性都有價，沒有「未定價」黑洞。
+    代價：單價不再能用「長劍 350g」直接驗證，且殘差被平均分攤到各屬性上。
+    """
+
+    LOW_CONFIDENCE_THRESHOLD = 5
+
+    def __init__(
+        self, diagnostics: Diagnostics, low_confidence_threshold: int | None = None
+    ) -> None:
+        self._diagnostics = diagnostics
+        self._threshold = (
+            self.LOW_CONFIDENCE_THRESHOLD
+            if low_confidence_threshold is None
+            else low_confidence_threshold
+        )
+        self.last_condition_number: float | None = None
+
+    def derive(self, items: Sequence[Item]) -> PriceTable:
+        import numpy as np
+        from scipy.optimize import nnls
+
+        rows = [i for i in items if i.stats]
+        counts: dict[StatKey, int] = {}
+        for i in rows:
+            for line in i.stats:
+                counts[line.stat] = counts.get(line.stat, 0) + 1
+
+        prices: dict[StatKey, float | None] = {stat: None for stat in StatKey}
+        if not rows or not counts:
+            self.last_condition_number = None
+            return PriceTable(prices=prices, low_confidence=frozenset())
+
+        columns = sorted(counts, key=lambda s: s.name)
+        matrix = np.array(
+            [[i.amount_of(s) or 0.0 for s in columns] for i in rows], dtype=float
+        )
+        totals = np.array([float(i.total_gold) for i in rows], dtype=float)
+
+        solution, _residual = nnls(matrix, totals)
+        self.last_condition_number = float(np.linalg.cond(matrix))
+
+        low: set[StatKey] = set()
+        for stat, price in zip(columns, solution, strict=True):
+            prices[stat] = float(price)
+            if counts[stat] < self._threshold:
+                low.add(stat)
+                self._diagnostics.low_confidence_price(stat, counts[stat])
+
+        return PriceTable(prices=prices, low_confidence=frozenset(low))
