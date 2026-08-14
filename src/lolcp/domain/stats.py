@@ -131,3 +131,32 @@ class StatLine:
 
     stat: StatKey
     amount: float
+
+
+# Data Dragon 欄位名 → StatKey。用於補法力，以及與 bin 的一致性交叉檢查。
+# Data Dragon 的 stats schema 只有 12 種欄位（缺技能加速、暴擊傷害、穿透等）。
+DDRAGON_FIELD_TO_STAT: dict[str, StatKey] = {
+    "FlatPhysicalDamageMod": StatKey.AD,
+    "FlatMagicDamageMod": StatKey.AP,
+    "FlatHPPoolMod": StatKey.HP,
+    "FlatMPPoolMod": StatKey.MANA,
+    "FlatArmorMod": StatKey.ARMOR,
+    "FlatSpellBlockMod": StatKey.MAGIC_RESIST,
+    "FlatCritChanceMod": StatKey.CRIT_CHANCE,
+    "PercentAttackSpeedMod": StatKey.ATTACK_SPEED,
+    "FlatMovementSpeedMod": StatKey.MOVE_SPEED_FLAT,
+    "PercentMovementSpeedMod": StatKey.MOVE_SPEED_PERCENT,
+    "PercentLifeStealMod": StatKey.LIFE_STEAL,
+    "FlatHPRegenMod": StatKey.HP_REGEN_FLAT,
+}
+
+# bin 檔以 float32 儲存百分比（0.15 → 0.15000000596046448）。
+# 乘 100 後殘留的表示誤差會讓單價變成 39.99999841 而非 40.0，
+# 因此正規化後必須四捨五入。遊戲數值的真實精度遠低於 4 位小數。
+NORMALIZED_PRECISION = 4
+
+
+def normalize_amount(stat: StatKey, raw: float) -> float:
+    """把原始值轉為正規化數值：百分比類以 1% 為單位，並消除 float32 雜訊。"""
+    value = raw * 100.0 if stat in NORMALIZE_X100 else float(raw)
+    return round(value, NORMALIZED_PRECISION)
