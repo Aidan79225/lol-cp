@@ -70,8 +70,10 @@ def test_anchor_item_lacking_the_stat_fails_loudly():
 
 
 def test_anchor_item_with_zero_amount_fails_loudly():
+    """比對「數量為 0」而非只比對 "0" —— 後者會被訊息裡的裝備 ID 1036 誤中，
+    連錯誤分支都能讓測試通過。"""
     items = [item(1036, 350, StatLine(StatKey.AD, 0.0))]
-    with pytest.raises(AnchorItemMissingError, match="0"):
+    with pytest.raises(AnchorItemMissingError, match="數量為 0"):
         CanonicalDeriver(anchors((StatKey.AD, 1036)), Diagnostics()).derive(items)
 
 
