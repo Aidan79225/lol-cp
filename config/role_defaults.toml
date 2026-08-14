@@ -1,0 +1,142 @@
+# 角色預設權重。英雄有多個 tag 時逐屬性取 max（見 domain/weights.py）。
+# 取 max 而非平均：把英雄實際會用的屬性設為 0 會隱藏資訊，
+# 比多算一個邊緣屬性糟得多。凱爾(Mage+Marksman)靠這條規則
+# 才能同時拿到 AD 1.0 與 AP 1.0。
+
+[Fighter]
+ad = 1.0
+ap = 0.0
+hp = 1.0
+mana = 0.4
+armor = 0.9
+magic_resist = 0.9
+crit_chance = 0.2
+crit_damage = 0.2
+attack_speed = 0.6
+ability_haste = 1.0
+move_speed_flat = 0.5
+move_speed_percent = 0.5
+base_hp_regen = 0.8
+hp_regen_flat = 0.8
+life_steal = 0.6
+heal_shield_power = 0.3
+tenacity = 0.9
+slow_resist = 0.5
+magic_pen_flat = 0.0
+magic_pen_percent = 0.0
+armor_pen_percent = 0.7
+
+[Tank]
+ad = 0.3
+ap = 0.0
+hp = 1.0
+mana = 0.4
+armor = 1.0
+magic_resist = 1.0
+crit_chance = 0.0
+crit_damage = 0.0
+attack_speed = 0.3
+ability_haste = 0.9
+move_speed_flat = 0.6
+move_speed_percent = 0.6
+base_hp_regen = 0.9
+hp_regen_flat = 0.9
+life_steal = 0.2
+heal_shield_power = 0.6
+tenacity = 1.0
+slow_resist = 0.8
+magic_pen_flat = 0.0
+magic_pen_percent = 0.0
+armor_pen_percent = 0.0
+
+[Mage]
+ad = 0.0
+ap = 1.0
+hp = 0.6
+mana = 0.9
+armor = 0.5
+magic_resist = 0.5
+crit_chance = 0.0
+crit_damage = 0.0
+attack_speed = 0.1
+ability_haste = 1.0
+move_speed_flat = 0.5
+move_speed_percent = 0.5
+base_hp_regen = 0.6
+hp_regen_flat = 0.5
+life_steal = 0.0
+heal_shield_power = 0.4
+tenacity = 0.5
+slow_resist = 0.5
+magic_pen_flat = 1.0
+magic_pen_percent = 1.0
+armor_pen_percent = 0.0
+
+[Marksman]
+ad = 1.0
+ap = 0.0
+hp = 0.4
+mana = 0.4
+armor = 0.3
+magic_resist = 0.3
+crit_chance = 1.0
+crit_damage = 1.0
+attack_speed = 1.0
+ability_haste = 0.5
+move_speed_flat = 0.7
+move_speed_percent = 0.7
+base_hp_regen = 0.4
+hp_regen_flat = 0.4
+life_steal = 1.0
+heal_shield_power = 0.2
+tenacity = 0.4
+slow_resist = 0.4
+magic_pen_flat = 0.0
+magic_pen_percent = 0.0
+armor_pen_percent = 0.8
+
+[Assassin]
+ad = 1.0
+ap = 0.0
+hp = 0.4
+mana = 0.4
+armor = 0.3
+magic_resist = 0.3
+crit_chance = 0.6
+crit_damage = 0.6
+attack_speed = 0.5
+ability_haste = 0.8
+move_speed_flat = 0.8
+move_speed_percent = 0.8
+base_hp_regen = 0.4
+hp_regen_flat = 0.4
+life_steal = 0.4
+heal_shield_power = 0.2
+tenacity = 0.4
+slow_resist = 0.4
+magic_pen_flat = 0.0
+magic_pen_percent = 0.0
+armor_pen_percent = 1.0
+
+[Support]
+ad = 0.2
+ap = 0.7
+hp = 0.7
+mana = 0.8
+armor = 0.6
+magic_resist = 0.6
+crit_chance = 0.0
+crit_damage = 0.0
+attack_speed = 0.2
+ability_haste = 1.0
+move_speed_flat = 0.7
+move_speed_percent = 0.7
+base_hp_regen = 0.7
+hp_regen_flat = 0.7
+life_steal = 0.1
+heal_shield_power = 1.0
+tenacity = 0.6
+slow_resist = 0.6
+magic_pen_flat = 0.5
+magic_pen_percent = 0.5
+armor_pen_percent = 0.0

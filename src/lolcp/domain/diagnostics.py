@@ -31,6 +31,7 @@ class Diagnostics:
     _filtered_variants: list[int] = field(default_factory=list)
     _low_confidence: dict[StatKey, int] = field(default_factory=dict)
     _unknown_partypes: list[str] = field(default_factory=list)
+    _unknown_roles: list[str] = field(default_factory=list)
 
     # ---- 記錄 ----
 
@@ -50,6 +51,9 @@ class Diagnostics:
 
     def unknown_partype(self, champion_key: str) -> None:
         self._unknown_partypes.append(champion_key)
+
+    def unknown_role(self, tag: str) -> None:
+        self._unknown_roles.append(tag)
 
     # ---- 查詢 ----
 
@@ -73,6 +77,10 @@ class Diagnostics:
     def unknown_partypes(self) -> tuple[str, ...]:
         return tuple(self._unknown_partypes)
 
+    @property
+    def unknown_roles(self) -> tuple[str, ...]:
+        return tuple(self._unknown_roles)
+
     def summary_line(self) -> str:
         parts: list[str] = []
         if self._unknown_bin_fields:
@@ -85,4 +93,6 @@ class Diagnostics:
             parts.append(f"低信賴單價 {len(self._low_confidence)} 種")
         if self._unknown_partypes:
             parts.append(f"未知資源類型 {len(self._unknown_partypes)} 隻")
+        if self._unknown_roles:
+            parts.append(f"未知角色標籤 {len(set(self._unknown_roles))} 種")
         return "  |  ".join(parts) if parts else "無異常"

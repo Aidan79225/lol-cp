@@ -7,6 +7,7 @@ from pathlib import Path
 
 from lolcp.domain.pricing import AnchorConfig, AnchorEntry
 from lolcp.domain.stats import StatKey
+from lolcp.domain.weights import RoleDefaults, StatWeights
 
 
 class ConfigError(ValueError):
@@ -35,3 +36,20 @@ def load_anchors(path: Path) -> AnchorConfig:
             )
         )
     return AnchorConfig(entries=tuple(entries))
+
+
+def _parse_weights(role: str, body: object) -> StatWeights:
+    if not isinstance(body, dict):
+        raise ConfigError(f"角色 {role!r} 的內容必須是表格")
+    weights: dict[StatKey, float] = {}
+    for key, value in body.items():
+        stat = StatKey.from_config_key(key)  # 未知鍵擲 UnknownStatKeyError
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ConfigError(f"{role}.{key} 必須是 0.0～1.0 的數值，得到 {value!r}")
+        weights[stat] = float(value)
+    return StatWeights(weights)
+
+
+def load_role_defaults(path: Path) -> RoleDefaults:
+    raw = _read_toml(path)
+    return RoleDefaults({role: _parse_weights(role, body) for role, body in raw.items()})
