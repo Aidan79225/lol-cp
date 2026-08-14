@@ -1,0 +1,133 @@
+"""屬性種類與單位正規化。
+
+單位正規化是本專案最容易靜默算錯的地方：bin 檔的百分比類屬性以分數儲存
+（0.25 = 25%），而 `mFlatCritDamageMod` 帶 Flat 前綴卻也是分數。因此
+NORMALIZE_X100 必須是明確列舉的常數集合，不得由欄位名前綴推導。
+集合內容由 16.15.1 全裝備的實際值域掃描推定。
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+
+
+class UnknownStatKeyError(ValueError):
+    """設定檔出現無法辨識的屬性鍵名。"""
+
+    def __init__(self, key: str) -> None:
+        valid = ", ".join(sorted(s.config_key for s in StatKey))
+        super().__init__(f"未知的屬性鍵名 {key!r}。合法選項：{valid}")
+        self.key = key
+
+
+class StatKey(Enum):
+    # ---- 召喚峽谷可定價（11 種，有錨定基礎裝備）----
+    AD = "AD"
+    AP = "AP"
+    HP = "HP"
+    MANA = "MANA"
+    ARMOR = "ARMOR"
+    MAGIC_RESIST = "MAGIC_RESIST"
+    CRIT_CHANCE = "CRIT_CHANCE"
+    ATTACK_SPEED = "ATTACK_SPEED"
+    ABILITY_HASTE = "ABILITY_HASTE"
+    MOVE_SPEED_FLAT = "MOVE_SPEED_FLAT"
+    BASE_HP_REGEN = "BASE_HP_REGEN"
+
+    # ---- 召喚峽谷未定價（10 種，無錨可推）----
+    CRIT_DAMAGE = "CRIT_DAMAGE"
+    HP_REGEN_FLAT = "HP_REGEN_FLAT"
+    LIFE_STEAL = "LIFE_STEAL"
+    MOVE_SPEED_PERCENT = "MOVE_SPEED_PERCENT"
+    HEAL_SHIELD_POWER = "HEAL_SHIELD_POWER"
+    TENACITY = "TENACITY"
+    SLOW_RESIST = "SLOW_RESIST"
+    MAGIC_PEN_FLAT = "MAGIC_PEN_FLAT"
+    MAGIC_PEN_PERCENT = "MAGIC_PEN_PERCENT"
+    ARMOR_PEN_PERCENT = "ARMOR_PEN_PERCENT"
+
+    # ---- 召喚峽谷未出現，但保留映射以偵測未知欄位（4 種）----
+    COOLDOWN_REDUCTION = "COOLDOWN_REDUCTION"
+    ARMOR_PEN_FLAT = "ARMOR_PEN_FLAT"
+    ATTACK_RANGE = "ATTACK_RANGE"
+    ATTACK_SPEED_MULTIPLICATIVE = "ATTACK_SPEED_MULTIPLICATIVE"
+
+    @property
+    def config_key(self) -> str:
+        return self.name.lower()
+
+    @classmethod
+    def from_config_key(cls, key: str) -> StatKey:
+        try:
+            return cls[key.upper()]
+        except KeyError:
+            raise UnknownStatKeyError(key) from None
+
+
+# bin 欄位名 → StatKey。24 個欄位，不含法力（bin 無此欄位）。
+BIN_FIELD_TO_STAT: dict[str, StatKey] = {
+    "mFlatPhysicalDamageMod": StatKey.AD,
+    "mFlatMagicDamageMod": StatKey.AP,
+    "mFlatHPPoolMod": StatKey.HP,
+    "mFlatArmorMod": StatKey.ARMOR,
+    "mFlatSpellBlockMod": StatKey.MAGIC_RESIST,
+    "mFlatCritChanceMod": StatKey.CRIT_CHANCE,
+    "mPercentAttackSpeedMod": StatKey.ATTACK_SPEED,
+    "mAbilityHasteMod": StatKey.ABILITY_HASTE,
+    "mFlatMovementSpeedMod": StatKey.MOVE_SPEED_FLAT,
+    "mPercentBaseHPRegenMod": StatKey.BASE_HP_REGEN,
+    "mFlatCritDamageMod": StatKey.CRIT_DAMAGE,
+    "mFlatHPRegenMod": StatKey.HP_REGEN_FLAT,
+    "mPercentLifeStealMod": StatKey.LIFE_STEAL,
+    "mPercentMovementSpeedMod": StatKey.MOVE_SPEED_PERCENT,
+    "mPercentHealingAmountMod": StatKey.HEAL_SHIELD_POWER,
+    "mPercentTenacityItemMod": StatKey.TENACITY,
+    "mPercentSlowResistMod": StatKey.SLOW_RESIST,
+    "mFlatMagicPenetrationMod": StatKey.MAGIC_PEN_FLAT,
+    "mPercentMagicPenetrationMod": StatKey.MAGIC_PEN_PERCENT,
+    "mPercentArmorPenetrationMod": StatKey.ARMOR_PEN_PERCENT,
+    "mPercentCooldownMod": StatKey.COOLDOWN_REDUCTION,
+    "mFlatArmorPenetrationMod": StatKey.ARMOR_PEN_FLAT,
+    "mFlatAttackRangeMod": StatKey.ATTACK_RANGE,
+    "mPercentMultiplicativeAttackSpeedMod": StatKey.ATTACK_SPEED_MULTIPLICATIVE,
+}
+
+# Data Dragon 的法力欄位（bin 沒有）。
+DDRAGON_MANA_FIELD = "FlatMPPoolMod"
+
+# 原始值為分數、需 ×100 轉為「以 1% 為單位」。
+# 依 16.15.1 實際值域推定，非依欄位名前綴。
+NORMALIZE_X100: frozenset[StatKey] = frozenset({
+    StatKey.CRIT_CHANCE,
+    StatKey.CRIT_DAMAGE,  # 帶 Flat 前綴卻是分數
+    StatKey.ATTACK_SPEED,
+    StatKey.ATTACK_SPEED_MULTIPLICATIVE,
+    StatKey.BASE_HP_REGEN,
+    StatKey.LIFE_STEAL,
+    StatKey.MOVE_SPEED_PERCENT,
+    StatKey.HEAL_SHIELD_POWER,
+    StatKey.TENACITY,
+    StatKey.SLOW_RESIST,
+    StatKey.MAGIC_PEN_PERCENT,
+    StatKey.ARMOR_PEN_PERCENT,
+    StatKey.COOLDOWN_REDUCTION,
+})
+
+# 召喚峽谷標準 ID 裝備實際出現的 21 種屬性。
+SR_STATS: frozenset[StatKey] = frozenset(
+    set(StatKey) - {
+        StatKey.COOLDOWN_REDUCTION,
+        StatKey.ARMOR_PEN_FLAT,
+        StatKey.ATTACK_RANGE,
+        StatKey.ATTACK_SPEED_MULTIPLICATIVE,
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class StatLine:
+    """一條已正規化的屬性。amount 一律為正規化後的數值。"""
+
+    stat: StatKey
+    amount: float

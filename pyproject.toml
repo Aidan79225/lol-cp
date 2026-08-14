@@ -1,0 +1,25 @@
+[project]
+name = "lolcp"
+version = "0.1.0"
+description = "英雄聯盟召喚峽谷裝備金幣效率分析工具"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "PySide6==6.11.1",
+    "scipy==1.18.0",
+    "numpy==2.5.2",
+]
+
+[project.scripts]
+lolcp = "lolcp.main:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["network: 需要網路連線的契約測試（預設跳過）"]
+addopts = "-m 'not network'"
