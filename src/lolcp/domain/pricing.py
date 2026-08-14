@@ -1,16 +1,25 @@
 """屬性單價的推導。
 
-本任務只建立錨定型別；PriceTable 與兩種定價法在 Task 7、8 補上。
+兩種定價法並列呈現，因為它們的分歧本身就是分析入口：
+差異大的裝備，要嘛被動價值高，要嘛屬性被權威法低估。
 
-錨定型別放在 domain 是因為「哪件裝備錨定哪種屬性」是業務規則，
-CanonicalDeriver（domain）必須以它為參數型別。只有從 toml 讀取
-才是 infrastructure 的事。
+PriceTable 的 None 與 0.0 是不同的事：
+  None = 未定價（無錨可推 / 未進入求解矩陣）
+  0.0  = 定價為零（NNLS 解出來就是零）
+混在一起就無法判斷 CP值 低是資料限制還是屬性真的不值錢。
+
+錨定型別（AnchorEntry / AnchorConfig）放在 domain 是因為
+「哪件裝備錨定哪種屬性」是業務規則；只有從 toml 讀取才是 infrastructure。
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import Protocol
 
+from lolcp.domain.diagnostics import Diagnostics
+from lolcp.domain.entities import Item
 from lolcp.domain.stats import StatKey
 
 
@@ -40,3 +49,69 @@ class AnchorConfig:
             if entry.stat is stat:
                 return entry
         return None
+
+
+class AnchorItemMissingError(RuntimeError):
+    """錨定裝備不存在或無法用於定價。刻意不降級 —— 必須大聲失敗。"""
+
+
+@dataclass(frozen=True)
+class PriceTable:
+    prices: Mapping[StatKey, float | None]
+    low_confidence: frozenset[StatKey]
+
+    def unit_price(self, stat: StatKey) -> float | None:
+        return self.prices.get(stat)
+
+    def is_priced(self, stat: StatKey) -> bool:
+        return self.prices.get(stat) is not None
+
+    @property
+    def priced_stats(self) -> frozenset[StatKey]:
+        return frozenset(s for s, p in self.prices.items() if p is not None)
+
+    def unpriced_stats(self, present: Iterable[StatKey]) -> frozenset[StatKey]:
+        return frozenset(s for s in present if not self.is_priced(s))
+
+
+class PriceDeriver(Protocol):
+    def derive(self, items: Sequence[Item]) -> PriceTable: ...
+
+
+class CanonicalDeriver:
+    """由指定的錨定基礎裝備反推單價。
+
+    錨定裝備一律以數值 ID 查找。以名稱查找會拿到其他模式的變體
+    （長劍 1036 是 350g，771036 是 400g），單價全錯且不會報錯。
+    """
+
+    def __init__(self, anchors: AnchorConfig, diagnostics: Diagnostics) -> None:
+        self._anchors = anchors
+        self._diagnostics = diagnostics
+
+    def derive(self, items: Sequence[Item]) -> PriceTable:
+        by_id = {i.item_id: i for i in items}
+        prices: dict[StatKey, float | None] = {stat: None for stat in StatKey}
+        for entry in self._anchors.entries:
+            prices[entry.stat] = self._price_from_anchor(entry, by_id)
+        return PriceTable(prices=prices, low_confidence=frozenset())
+
+    def _price_from_anchor(self, entry: AnchorEntry, by_id: dict[int, Item]) -> float:
+        anchor = by_id.get(entry.item_id)
+        if anchor is None:
+            raise AnchorItemMissingError(
+                f"錨定裝備 {entry.item_id} 不存在於當前版本"
+                f"（{entry.stat.config_key}）。Riot 可能已移除該裝備，需更新 anchors.toml。"
+            )
+        amount = anchor.amount_of(entry.stat)
+        if amount is None:
+            raise AnchorItemMissingError(
+                f"錨定裝備 {entry.item_id}（{anchor.name}）沒有 "
+                f"{entry.stat.name} 屬性，無法用於定價。"
+            )
+        if amount == 0:
+            raise AnchorItemMissingError(
+                f"錨定裝備 {entry.item_id}（{anchor.name}）的 "
+                f"{entry.stat.name} 數量為 0，無法作為分母。"
+            )
+        return anchor.total_gold / amount
