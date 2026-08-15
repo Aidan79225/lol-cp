@@ -1,16 +1,3 @@
-# brainstorming 視覺草稿（本機用，不入庫）
-.superpowers/
-
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-.pytest_cache/
-.ruff_cache/
-*.egg-info/
-
-# uv
-.python-version
-
-# macOS
-.DS_Store
+# 權重拉桿寫入的使用者調校不進版控；專案種子檔逐一排除
+config/champions/*
+!config/champions/Kayle.toml
