@@ -119,7 +119,7 @@ def test_crit_damage_is_the_unpriced_stat_on_infinity_edge(engine):
 
 
 @pytest.mark.parametrize(
-    "anchor_item_id", [1053, 3035], ids=["吸血鬼權杖", "最後耳語"]
+    "anchor_item_id", [1053, 3035, 3134], ids=["吸血鬼權杖", "最後耳語", "殘暴之力"]
 )
 def test_deduction_anchor_items_are_locked_to_exactly_100_percent(engine, anchor_item_id):
     """扣除錨的固有代價：錨定裝備自身 CP值 恆為 100%、殘差 0。

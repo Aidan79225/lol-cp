@@ -9,9 +9,9 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 ANCHORS = REPO_ROOT / "config" / "anchors.toml"
 
 
-def test_real_anchors_file_has_thirteen_entries():
+def test_real_anchors_file_has_fourteen_entries():
     config = load_anchors(ANCHORS)
-    assert len(config.entries) == 13
+    assert len(config.entries) == 14
 
 
 def test_real_anchors_cover_exactly_the_priceable_stats():
@@ -23,6 +23,7 @@ def test_real_anchors_cover_exactly_the_priceable_stats():
         StatKey.MOVE_SPEED_FLAT, StatKey.BASE_HP_REGEN,
         StatKey.LIFE_STEAL,          # 扣除錨（吸血鬼權杖）
         StatKey.ARMOR_PEN_PERCENT,   # 扣除錨（最後耳語）
+        StatKey.ARMOR_PEN_FLAT,      # 扣除錨（殘暴之力）
     })
 
 
