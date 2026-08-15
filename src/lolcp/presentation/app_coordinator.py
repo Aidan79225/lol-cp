@@ -45,8 +45,10 @@ class AppCoordinator(QObject):
     @Slot(object)
     def on_finished(self, result) -> None:
         if self._window is None:
-            list_valuations, champions = self._build(result.version)
-            self._window = MainWindow(list_valuations, champions, self._diagnostics)
+            list_valuations, champions, adjust_weights = self._build(result.version)
+            self._window = MainWindow(
+                list_valuations, champions, self._diagnostics, adjust_weights
+            )
             self._window.refresh_button.clicked.connect(self._on_refresh_clicked)
             self._window.show()
         elif result.version != self._version:

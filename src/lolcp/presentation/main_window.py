@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSplitter,
     QTableView,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -24,6 +25,7 @@ from lolcp.presentation.widgets.detail_panel import DetailPanel
 from lolcp.presentation.widgets.filter_bar import FilterBar
 from lolcp.presentation.widgets.profile_selector import ProfileSelector
 from lolcp.presentation.widgets.status_bar import StatusBarWidget
+from lolcp.presentation.widgets.weight_panel import WeightPanel
 
 
 class MainWindow(QMainWindow):
@@ -32,6 +34,7 @@ class MainWindow(QMainWindow):
         list_valuations: ListValuations,
         champions: tuple[Champion, ...],
         diagnostics: Diagnostics,
+        adjust_weights=None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -40,6 +43,7 @@ class MainWindow(QMainWindow):
 
         self._list_valuations = list_valuations
         self._diagnostics = diagnostics
+        self._adjust_weights = adjust_weights
         self._sync_result: SyncResult | None = None
         self._all_comparisons: tuple = ()
 
@@ -71,9 +75,14 @@ class MainWindow(QMainWindow):
         self._table.selectionModel().currentRowChanged.connect(self._on_row_changed)
 
         self._detail = DetailPanel(self)
+        self._weight_panel = WeightPanel(self)
+        self._weight_panel.weight_committed.connect(self._on_weight_committed)
+        tabs = QTabWidget(self)
+        tabs.addTab(self._detail, "詳情")
+        tabs.addTab(self._weight_panel, "權重")
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         splitter.addWidget(self._table)
-        splitter.addWidget(self._detail)
+        splitter.addWidget(tabs)
         splitter.setSizes([700, 400])
 
         self._status = StatusBarWidget(self)
@@ -98,10 +107,14 @@ class MainWindow(QMainWindow):
         self._progress.setValue(done)
 
     def set_use_cases(
-        self, list_valuations: ListValuations, champions: tuple[Champion, ...]
+        self,
+        list_valuations: ListValuations,
+        champions: tuple[Champion, ...],
+        adjust_weights=None,
     ) -> None:
         """換版本後注入新的 use case 與英雄清單。視角重設為全域。"""
         self._list_valuations = list_valuations
+        self._adjust_weights = adjust_weights
         self._profile.set_champions(champions)
 
     def reload(self) -> None:
@@ -113,6 +126,7 @@ class MainWindow(QMainWindow):
         if current_tag:
             self._filter.select_tag(current_tag)
         self._apply_filter()
+        self._refresh_weight_panel()
         if self._sync_result is not None:
             self._status.update_status(self._sync_result, self._diagnostics)
 
@@ -128,6 +142,25 @@ class MainWindow(QMainWindow):
 
     def _on_row_changed(self, current, _previous) -> None:
         self._detail.show_comparison(self._model.comparison_at(current.row()))
+
+    def _refresh_weight_panel(self) -> None:
+        champion = self._profile.current_champion()
+        resolver = self._list_valuations.weight_resolver
+        if champion is None:
+            self._weight_panel.set_context(None, None, {})
+            return
+        self._weight_panel.set_context(
+            champion,
+            resolver.resolve_defaults(champion),
+            resolver.overrides.by_champion.get(champion.key, {}),
+        )
+
+    def _on_weight_committed(self, stat, value: float) -> None:
+        champion = self._profile.current_champion()
+        if champion is None or self._adjust_weights is None:
+            return
+        self._adjust_weights.execute(champion, stat, value)
+        self.reload()
 
     @property
     def refresh_button(self) -> QPushButton:

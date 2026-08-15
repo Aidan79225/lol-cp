@@ -9,6 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from lolcp.application.use_cases.adjust_champion_weight import AdjustChampionWeight
 from lolcp.application.use_cases.list_valuations import ListValuations
 from lolcp.application.use_cases.sync_game_data import SyncGameData
 from lolcp.domain.diagnostics import Diagnostics
@@ -25,9 +26,9 @@ from lolcp.infrastructure.repositories.file_champion_repository import (
 from lolcp.infrastructure.repositories.file_item_repository import FileItemRepository
 from lolcp.infrastructure.repositories.toml_config import (
     load_anchors,
-    load_champion_overrides,
     load_role_defaults,
 )
+from lolcp.infrastructure.repositories.toml_overrides_store import TomlOverridesStore
 
 DEFAULT_CACHE_ROOT = Path.home() / ".cache" / "lol-cp"
 CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config"
@@ -61,21 +62,24 @@ def build_use_cases(context: AppContext, version: str):
     diagnostics = context.diagnostics
     items = FileItemRepository(patch_dir, ItemMapper(diagnostics))
     champions = FileChampionRepository(patch_dir, diagnostics)
+    overrides_store = TomlOverridesStore(context.config_dir / "champions")
+    weight_resolver = WeightResolver(
+        role_defaults=load_role_defaults(context.config_dir / "role_defaults.toml"),
+        resource_rule=ResourceRule(diagnostics),
+        overrides=overrides_store.load(),
+        diagnostics=diagnostics,
+    )
     list_valuations = ListValuations(
         items=items,
         canonical_deriver=CanonicalDeriver(
             load_anchors(context.config_dir / "anchors.toml"), diagnostics
         ),
         least_squares_deriver=LeastSquaresDeriver(diagnostics),
-        weight_resolver=WeightResolver(
-            role_defaults=load_role_defaults(context.config_dir / "role_defaults.toml"),
-            resource_rule=ResourceRule(diagnostics),
-            overrides=load_champion_overrides(context.config_dir / "champions"),
-            diagnostics=diagnostics,
-        ),
+        weight_resolver=weight_resolver,
         valuation=LinearValuation(),
     )
-    return list_valuations, champions.all_champions()
+    adjust_weights = AdjustChampionWeight(overrides_store, weight_resolver)
+    return list_valuations, champions.all_champions(), adjust_weights
 
 
 def main() -> int:

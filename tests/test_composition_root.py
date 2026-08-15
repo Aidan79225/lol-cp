@@ -27,7 +27,7 @@ def test_build_use_cases_produces_a_working_pipeline(tmp_path):
     (cache_root / "16.15.1" / ".complete").write_text("", encoding="utf-8")
 
     context = build_application(cache_root=cache_root, config_dir=CONFIG)
-    list_valuations, champions = build_use_cases(context, "16.15.1")
+    list_valuations, champions, _adjust = build_use_cases(context, "16.15.1")
 
     comparisons = list_valuations.execute(None)
     assert comparisons
