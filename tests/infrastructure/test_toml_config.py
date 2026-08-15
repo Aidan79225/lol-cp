@@ -101,3 +101,14 @@ def test_non_list_deduct_is_rejected(tmp_path):
     )
     with pytest.raises(ConfigError, match="陣列"):
         load_anchors(toml)
+
+
+def test_non_string_deduct_element_is_rejected(tmp_path):
+    """TOML 允許異質陣列，deduct = [1] 不可炸出裸 AttributeError。"""
+    toml = tmp_path / "anchors.toml"
+    toml.write_text(
+        '[life_steal]\nitem_id = 1053\ndeduct = [1]\nreason = "非字串"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="字串"):
+        load_anchors(toml)

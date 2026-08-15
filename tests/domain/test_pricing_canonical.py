@@ -200,3 +200,19 @@ def test_exactly_zero_remainder_also_fails():
 
 def test_pure_entries_default_to_empty_deduct():
     assert AnchorEntry(StatKey.AD, 1036, "test").deduct == ()
+
+
+def test_duplicate_deduct_entries_fail_loudly():
+    """deduct = ["ad", "ad"] 的 TOML 手誤會讓扣除量加倍 ——
+    frozenset 集合比較看不見重複，必須另行擋下。"""
+    items = [
+        item(1036, 350, StatLine(StatKey.AD, 10.0)),
+        item(1053, 2000, StatLine(StatKey.AD, 15.0), StatLine(StatKey.LIFE_STEAL, 7.0)),
+    ]
+    config = AnchorConfig((
+        AnchorEntry(StatKey.AD, 1036, "test"),
+        AnchorEntry(StatKey.LIFE_STEAL, 1053, "test",
+                    deduct=(StatKey.AD, StatKey.AD)),
+    ))
+    with pytest.raises(AnchorItemMissingError, match="重複"):
+        CanonicalDeriver(config, Diagnostics()).derive(items)

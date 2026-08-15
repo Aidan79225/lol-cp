@@ -124,6 +124,15 @@ class CanonicalDeriver:
         Riot 改動錨定裝備的屬性組成時要在啟動時炸掉，
         絕不靜默產生漂移的單價。
         """
+        if len(entry.deduct) != len(set(entry.deduct)):
+            duplicated = sorted(
+                {s.name for s in entry.deduct if entry.deduct.count(s) > 1}
+            )
+            raise AnchorItemMissingError(
+                f"扣除錨 {entry.item_id} 的 deduct 有重複屬性 {duplicated}，"
+                f"會被重複扣除 —— frozenset 集合比較看不見重複，必須在此擋下。"
+            )
+
         anchor = self._anchor_item(entry, by_id)
 
         expected = frozenset((entry.stat, *entry.deduct))

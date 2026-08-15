@@ -31,6 +31,8 @@ def load_anchors(path: Path) -> AnchorConfig:
         deduct_raw = body.get("deduct", [])
         if not isinstance(deduct_raw, list):
             raise ConfigError(f"錨定項 {key!r} 的 deduct 必須是陣列")
+        if not all(isinstance(d, str) for d in deduct_raw):
+            raise ConfigError(f"錨定項 {key!r} 的 deduct 元素必須是字串")
         entries.append(
             AnchorEntry(
                 stat=stat,
