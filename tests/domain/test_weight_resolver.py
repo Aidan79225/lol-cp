@@ -98,3 +98,32 @@ def test_champion_without_override_file_is_unaffected():
         champion("Draven", ("Marksman",))
     )
     assert weights.of(StatKey.ARMOR_PEN_PERCENT) == 0.8
+
+
+def test_resolve_defaults_excludes_overrides():
+    """拉桿基準值 = 前兩層，不含覆寫。"""
+    weights = resolver({"Kayle": {StatKey.ARMOR_PEN_PERCENT: 0.4}}).resolve_defaults(
+        champion("Kayle", ("Mage", "Marksman"))
+    )
+    assert weights.of(StatKey.ARMOR_PEN_PERCENT) == 0.8
+
+
+def test_resolve_defaults_still_applies_resource_rule():
+    weights = resolver().resolve_defaults(
+        champion("Yasuo", ("Marksman",), partype="Flow")
+    )
+    assert weights.of(StatKey.MANA) == 0.0
+
+
+def test_resolve_defaults_for_none_is_uniform():
+    assert resolver().resolve_defaults(None).of(StatKey.AD) == 1.0
+
+
+def test_replace_overrides_takes_effect_on_next_resolve():
+    r = resolver()
+    assert r.resolve(champion("Draven", ("Marksman",))).of(StatKey.ARMOR_PEN_PERCENT) == 0.8
+    r.replace_overrides(
+        ChampionOverrides({"Draven": {StatKey.ARMOR_PEN_PERCENT: 0.1}})
+    )
+    assert r.resolve(champion("Draven", ("Marksman",))).of(StatKey.ARMOR_PEN_PERCENT) == 0.1
+    assert r.overrides.by_champion["Draven"][StatKey.ARMOR_PEN_PERCENT] == 0.1

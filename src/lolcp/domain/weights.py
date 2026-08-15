@@ -121,6 +121,20 @@ class WeightResolver:
     def resolve(self, champion: Champion | None) -> StatWeights:
         if champion is None:
             return StatWeights.uniform()  # 全域客觀視角
-        weights = self._role_defaults.union_max(champion.tags, self._diagnostics)
-        weights = self._resource_rule.apply(weights, champion)
+        weights = self.resolve_defaults(champion)
         return self._overrides.apply(weights, champion.key)
+
+    def resolve_defaults(self, champion: Champion | None) -> StatWeights:
+        """前兩層（角色預設 → 資源規則），即零覆寫時的值。拉桿的基準。"""
+        if champion is None:
+            return StatWeights.uniform()
+        weights = self._role_defaults.union_max(champion.tags, self._diagnostics)
+        return self._resource_rule.apply(weights, champion)
+
+    def replace_overrides(self, overrides: ChampionOverrides) -> None:
+        """拉桿寫檔後換掉覆寫層。domain 第二個刻意可變處（第一個是 Diagnostics）。"""
+        self._overrides = overrides
+
+    @property
+    def overrides(self) -> ChampionOverrides:
+        return self._overrides
