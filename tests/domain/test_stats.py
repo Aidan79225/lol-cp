@@ -41,7 +41,7 @@ def test_flat_magic_penetration_is_absolute_despite_being_a_penetration_stat():
     assert StatKey.MAGIC_PEN_FLAT not in NORMALIZE_X100
 
 
-def test_normalize_set_has_exactly_the_thirteen_fraction_stats():
+def test_normalize_set_has_exactly_the_fifteen_fraction_stats():
     assert NORMALIZE_X100 == frozenset({
         StatKey.CRIT_CHANCE,
         StatKey.CRIT_DAMAGE,
@@ -49,6 +49,8 @@ def test_normalize_set_has_exactly_the_thirteen_fraction_stats():
         StatKey.ATTACK_SPEED_MULTIPLICATIVE,
         StatKey.BASE_HP_REGEN,
         StatKey.LIFE_STEAL,
+        StatKey.OMNIVAMP,        # 0.025 → 2.5%
+        StatKey.BASE_MP_REGEN,   # 1.25 → 125%
         StatKey.MOVE_SPEED_PERCENT,
         StatKey.HEAL_SHIELD_POWER,
         StatKey.TENACITY,
@@ -59,19 +61,23 @@ def test_normalize_set_has_exactly_the_thirteen_fraction_stats():
     })
 
 
-def test_bin_field_map_covers_all_twentyfour_bin_fields():
-    assert len(BIN_FIELD_TO_STAT) == 24
+def test_bin_field_map_covers_all_twentynine_bin_fields():
+    assert len(BIN_FIELD_TO_STAT) == 29
     assert "mAbilityHasteMod" in BIN_FIELD_TO_STAT
+    assert "PhysicalLethality" in BIN_FIELD_TO_STAT   # 裸名慣例
+    assert "flatMPPoolMod" in BIN_FIELD_TO_STAT       # 小寫慣例
 
 
-def test_mana_is_not_a_bin_field():
-    """bin 檔完全不存法力，法力只能來自 Data Dragon。"""
-    assert StatKey.MANA not in BIN_FIELD_TO_STAT.values()
+def test_mana_comes_from_both_sources():
+    """「bin 完全不存法力」是舊的錯誤結論 —— bin 以小寫 flatMPPoolMod
+    存法力（15 件），DD 23 件補缺，重疊值實測零分歧。"""
+    assert BIN_FIELD_TO_STAT["flatMPPoolMod"] is StatKey.MANA
 
 
-def test_sr_stats_is_twentyone():
-    assert len(SR_STATS) == 21
+def test_sr_stats_is_twentyfive():
+    assert len(SR_STATS) == 25
     assert StatKey.MANA in SR_STATS
+    assert StatKey.ARMOR_PEN_FLAT in SR_STATS  # 穿甲，盲點修復後現身（12 件）
     assert StatKey.COOLDOWN_REDUCTION not in SR_STATS  # 非 SR，但仍在 StatKey 內
 
 

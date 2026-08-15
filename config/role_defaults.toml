@@ -25,6 +25,10 @@ slow_resist = 0.5
 magic_pen_flat = 0.0
 magic_pen_percent = 0.0
 armor_pen_percent = 0.7
+armor_pen_flat = 0.7    # 穿甲；鏡射 armor_pen_percent
+omnivamp = 0.6
+base_mp_regen = 0.4    # 鏡射 mana（資源連動）
+mp_regen_flat = 0.4    # 鏡射 mana（資源連動）
 
 [Tank]
 ad = 0.3
@@ -48,6 +52,10 @@ slow_resist = 0.8
 magic_pen_flat = 0.0
 magic_pen_percent = 0.0
 armor_pen_percent = 0.0
+armor_pen_flat = 0.0    # 穿甲；鏡射 armor_pen_percent
+omnivamp = 0.3
+base_mp_regen = 0.4    # 鏡射 mana（資源連動）
+mp_regen_flat = 0.4    # 鏡射 mana（資源連動）
 
 [Mage]
 ad = 0.0
@@ -71,6 +79,10 @@ slow_resist = 0.5
 magic_pen_flat = 1.0
 magic_pen_percent = 1.0
 armor_pen_percent = 0.0
+armor_pen_flat = 0.0    # 穿甲；鏡射 armor_pen_percent
+omnivamp = 0.4
+base_mp_regen = 0.9    # 鏡射 mana（資源連動）
+mp_regen_flat = 0.9    # 鏡射 mana（資源連動）
 
 [Marksman]
 ad = 1.0
@@ -94,6 +106,10 @@ slow_resist = 0.4
 magic_pen_flat = 0.0
 magic_pen_percent = 0.0
 armor_pen_percent = 0.8
+armor_pen_flat = 0.8    # 穿甲；鏡射 armor_pen_percent
+omnivamp = 0.6
+base_mp_regen = 0.4    # 鏡射 mana（資源連動）
+mp_regen_flat = 0.4    # 鏡射 mana（資源連動）
 
 [Assassin]
 ad = 1.0
@@ -117,6 +133,10 @@ slow_resist = 0.4
 magic_pen_flat = 0.0
 magic_pen_percent = 0.0
 armor_pen_percent = 1.0
+armor_pen_flat = 1.0    # 穿甲；鏡射 armor_pen_percent
+omnivamp = 0.6
+base_mp_regen = 0.4    # 鏡射 mana（資源連動）
+mp_regen_flat = 0.4    # 鏡射 mana（資源連動）
 
 [Support]
 ad = 0.2
@@ -140,3 +160,7 @@ slow_resist = 0.6
 magic_pen_flat = 0.5
 magic_pen_percent = 0.5
 armor_pen_percent = 0.0
+armor_pen_flat = 0.0    # 穿甲；鏡射 armor_pen_percent
+omnivamp = 0.2
+base_mp_regen = 0.8    # 鏡射 mana（資源連動）
+mp_regen_flat = 0.8    # 鏡射 mana（資源連動）

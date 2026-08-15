@@ -130,3 +130,11 @@ def test_replace_overrides_takes_effect_on_next_resolve():
     )
     assert r.resolve(champion("Draven", ("Marksman",))).of(StatKey.ARMOR_PEN_PERCENT) == 0.1
     assert r.overrides.by_champion["Draven"][StatKey.ARMOR_PEN_PERCENT] == 0.1
+
+
+def test_non_mana_champion_gets_mana_linked_stats_zeroed():
+    """犽宿不但不用法力，也不該重視魔力回復 —— 資源規則涵蓋整組法力連動屬性。"""
+    weights = resolver().resolve(champion("Yasuo", ("Marksman",), partype="Flow"))
+    assert weights.of(StatKey.MANA) == 0.0
+    assert weights.of(StatKey.BASE_MP_REGEN) == 0.0
+    assert weights.of(StatKey.MP_REGEN_FLAT) == 0.0

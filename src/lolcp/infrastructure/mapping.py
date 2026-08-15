@@ -30,21 +30,18 @@ def looks_like_bin_stat_field(name: str, value: object) -> bool:
     用於偵測「看起來是屬性但我不認識」的欄位，好記錄進診斷而非靜默丟棄。
     bool 必須排除：Python 的 bool 是 int 的子類，`mCanBeSold: true` 會誤判。
 
-    命名慣例是 `m` + 大寫字母開頭、`Mod` 結尾（如 mFlatPhysicalDamageMod）。
-    這裡刻意不把已知前綴（mFlat/mPercent/mAbility）寫成允許清單——
-    這個 predicate 的存在意義正是要接住「以後 Riot 加的新屬性種類」，
-    寫死已知前綴會讓它形同虛設。以 16.15.1 全裝備資料驗證過：
-    唯一符合 `m`+大寫...`Mod` 形態卻不是屬性的欄位是 mRequiredLevel，
-    它不以 Mod 結尾，因此不會誤判。
+    命名慣例有三種（原版只認第一種，導致穿甲／全能吸血／魔回被靜默
+    丟棄多年 —— 見 2026-08-15 盲點修復 spec）：
+      1. mXxxMod（mFlatPhysicalDamageMod）
+      2. 小寫開頭 Mod 結尾（flatMPPoolMod、percentBaseMPRegenMod）
+      3. 裸名 Lethality 結尾（PhysicalLethality）
+    統一判準：`Mod` 或 `Lethality` 結尾。以 16.15.1 全裝備驗證無誤判：
+    sellBackModifier 以 Modifier 結尾不中；maxStack、mRequiredLevel、
+    LastMajorChange*、ShopOrderPriority 皆無此二字尾。
     """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
-    return (
-        len(name) > 1
-        and name[0] == "m"
-        and name[1].isupper()
-        and name.endswith(_STAT_FIELD_SUFFIX)
-    )
+    return name.endswith(_STAT_FIELD_SUFFIX) or name.endswith("Lethality")
 
 
 class ItemMapper:
@@ -102,18 +99,21 @@ class ItemMapper:
         return stats
 
     def _merge_mana(self, stats: dict[StatKey, float], raw_dd: dict) -> None:
-        """bin 完全不存法力，只有這一項可以由 Data Dragon 補進來。"""
+        """法力以 bin（flatMPPoolMod，15 件）優先，DD（23 件）只補缺。
+
+        兩來源重疊值實測零分歧；若日後分歧，一致性檢查會記錄。
+        """
         raw_mana = (raw_dd.get("stats") or {}).get(DDRAGON_MANA_FIELD)
         if raw_mana:
-            stats[StatKey.MANA] = normalize_amount(StatKey.MANA, float(raw_mana))
+            stats.setdefault(StatKey.MANA, normalize_amount(StatKey.MANA, float(raw_mana)))
 
     def _check_consistency(
         self, item_id: int, stats: dict[StatKey, float], raw_dd: dict
     ) -> None:
-        """重疊屬性交叉檢查。bin 勝出，但分歧必須留下記錄。"""
+        """重疊屬性交叉檢查（含法力）。bin 勝出，但分歧必須留下記錄。"""
         for field_name, raw_value in (raw_dd.get("stats") or {}).items():
             stat = DDRAGON_FIELD_TO_STAT.get(field_name)
-            if stat is None or stat is StatKey.MANA or stat not in stats or not raw_value:
+            if stat is None or stat not in stats or not raw_value:
                 continue
             ddragon_amount = normalize_amount(stat, float(raw_value))
             if abs(stats[stat] - ddragon_amount) > 1e-6:

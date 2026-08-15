@@ -22,6 +22,11 @@ KNOWN_ROLES: tuple[str, ...] = (
     "Assassin", "Fighter", "Mage", "Marksman", "Support", "Tank",
 )
 
+# 非法力英雄要一併歸零的資源連動屬性。
+MANA_LINKED_STATS: frozenset[StatKey] = frozenset({
+    StatKey.MANA, StatKey.BASE_MP_REGEN, StatKey.MP_REGEN_FLAT,
+})
+
 DEFAULT_WEIGHT = 1.0
 
 
@@ -87,7 +92,9 @@ class ResourceRule:
             return weights
         if champion.uses_mana:
             return weights
-        return weights.with_stat(StatKey.MANA, 0.0)
+        for stat in MANA_LINKED_STATS:
+            weights = weights.with_stat(stat, 0.0)
+        return weights
 
 
 @dataclass(frozen=True)

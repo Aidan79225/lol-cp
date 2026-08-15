@@ -35,7 +35,7 @@ class StatKey(Enum):
     MOVE_SPEED_FLAT = "MOVE_SPEED_FLAT"
     BASE_HP_REGEN = "BASE_HP_REGEN"
 
-    # ---- 召喚峽谷未定價（10 種，無錨可推）----
+    # ---- 召喚峽谷未定價 ----
     CRIT_DAMAGE = "CRIT_DAMAGE"
     HP_REGEN_FLAT = "HP_REGEN_FLAT"
     LIFE_STEAL = "LIFE_STEAL"
@@ -46,10 +46,13 @@ class StatKey(Enum):
     MAGIC_PEN_FLAT = "MAGIC_PEN_FLAT"
     MAGIC_PEN_PERCENT = "MAGIC_PEN_PERCENT"
     ARMOR_PEN_PERCENT = "ARMOR_PEN_PERCENT"
+    ARMOR_PEN_FLAT = "ARMOR_PEN_FLAT"    # 穿甲（PhysicalLethality），12 件
+    OMNIVAMP = "OMNIVAMP"                # 全能吸血，6 件
+    BASE_MP_REGEN = "BASE_MP_REGEN"      # 基礎魔力回復，19 件
+    MP_REGEN_FLAT = "MP_REGEN_FLAT"      # 固定魔力回復，1 件
 
-    # ---- 召喚峽谷未出現，但保留映射以偵測未知欄位（4 種）----
+    # ---- 召喚峽谷未出現，但保留映射以偵測未知欄位（3 種）----
     COOLDOWN_REDUCTION = "COOLDOWN_REDUCTION"
-    ARMOR_PEN_FLAT = "ARMOR_PEN_FLAT"
     ATTACK_RANGE = "ATTACK_RANGE"
     ATTACK_SPEED_MULTIPLICATIVE = "ATTACK_SPEED_MULTIPLICATIVE"
 
@@ -65,7 +68,8 @@ class StatKey(Enum):
             raise UnknownStatKeyError(key) from None
 
 
-# bin 欄位名 → StatKey。24 個欄位，不含法力（bin 無此欄位）。
+# bin 欄位名 → StatKey。命名慣例有三種（見 2026-08-15 盲點修復 spec）：
+#   mXxxMod（多數）、小寫開頭（flatMPPoolMod 等）、裸名（PhysicalLethality）。
 BIN_FIELD_TO_STAT: dict[str, StatKey] = {
     "mFlatPhysicalDamageMod": StatKey.AD,
     "mFlatMagicDamageMod": StatKey.AP,
@@ -91,9 +95,16 @@ BIN_FIELD_TO_STAT: dict[str, StatKey] = {
     "mFlatArmorPenetrationMod": StatKey.ARMOR_PEN_FLAT,
     "mFlatAttackRangeMod": StatKey.ATTACK_RANGE,
     "mPercentMultiplicativeAttackSpeedMod": StatKey.ATTACK_SPEED_MULTIPLICATIVE,
+    # ---- 第二、三種命名慣例（曾被靜默丟棄的盲點）----
+    "PhysicalLethality": StatKey.ARMOR_PEN_FLAT,
+    "PercentOmnivampMod": StatKey.OMNIVAMP,
+    "percentBaseMPRegenMod": StatKey.BASE_MP_REGEN,
+    "flatMPRegenMod": StatKey.MP_REGEN_FLAT,
+    "flatMPPoolMod": StatKey.MANA,
 }
 
-# Data Dragon 的法力欄位（bin 沒有）。
+# Data Dragon 的法力欄位（bin 的小寫 flatMPPoolMod 只涵蓋 15 件，DD 23 件，
+# 兩者重疊值零分歧；bin 優先、DD 補缺）。
 DDRAGON_MANA_FIELD = "FlatMPPoolMod"
 
 # 原始值為分數、需 ×100 轉為「以 1% 為單位」。
@@ -112,13 +123,14 @@ NORMALIZE_X100: frozenset[StatKey] = frozenset({
     StatKey.MAGIC_PEN_PERCENT,
     StatKey.ARMOR_PEN_PERCENT,
     StatKey.COOLDOWN_REDUCTION,
+    StatKey.OMNIVAMP,        # 0.025 → 2.5%
+    StatKey.BASE_MP_REGEN,   # 1.25 → 125%，與 BASE_HP_REGEN 同型
 })
 
-# 召喚峽谷標準 ID 裝備實際出現的 21 種屬性。
+# 召喚峽谷標準 ID 裝備實際出現的 25 種屬性。
 SR_STATS: frozenset[StatKey] = frozenset(
     set(StatKey) - {
         StatKey.COOLDOWN_REDUCTION,
-        StatKey.ARMOR_PEN_FLAT,
         StatKey.ATTACK_RANGE,
         StatKey.ATTACK_SPEED_MULTIPLICATIVE,
     }

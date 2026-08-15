@@ -112,3 +112,48 @@ def test_map_all_finds_no_conflicts_in_real_data(mapper, diagnostics, dd_data, b
 def test_map_all_produces_no_unknown_fields_in_real_data(mapper, diagnostics, dd_data, bin_data):
     mapper.map_all(dd_data, bin_data)
     assert diagnostics.unknown_bin_fields == {}
+
+
+def test_serrated_dirk_lethality_is_read_as_flat_armor_pen(mapper, dd_data, bin_data):
+    """殘暴之力 3134：PhysicalLethality 是裸名欄位（第三種命名慣例），
+    曾被靜默丟棄 —— 整條穿甲屬性從未進過系統。"""
+    items = mapper.map_all(dd_data, bin_data)
+    dirk = next(i for i in items if i.item_id == 3134)
+    assert dirk.amount_of(StatKey.ARMOR_PEN_FLAT) == 10.0
+
+
+def test_dorans_blade_omnivamp_is_normalized_to_percent(mapper, dd_data, bin_data):
+    """多蘭之劍 1055：PercentOmnivampMod 0.025 → 2.5（以 1% 為單位）。"""
+    items = mapper.map_all(dd_data, bin_data)
+    dorans = next(i for i in items if i.item_id == 1055)
+    assert dorans.amount_of(StatKey.OMNIVAMP) == 2.5
+
+
+def test_lowercase_base_mp_regen_is_read(mapper, dd_data, bin_data):
+    """蘇瑞亞的戰歌 2065：percentBaseMPRegenMod 小寫開頭（第二種命名慣例）。"""
+    items = mapper.map_all(dd_data, bin_data)
+    songs = next(i for i in items if i.item_id == 2065)
+    assert songs.amount_of(StatKey.BASE_MP_REGEN) == 125.0
+
+
+def test_stat_field_predicate_accepts_all_three_naming_conventions():
+    assert looks_like_bin_stat_field("PhysicalLethality", 10.0)
+    assert looks_like_bin_stat_field("percentBaseMPRegenMod", 1.25)
+    assert looks_like_bin_stat_field("flatMPPoolMod", 600.0)
+    assert looks_like_bin_stat_field("PercentOmnivampMod", 0.025)
+
+
+def test_stat_field_predicate_still_rejects_non_stats():
+    assert not looks_like_bin_stat_field("sellBackModifier", 1.0)  # Modifier ≠ Mod
+    assert not looks_like_bin_stat_field("maxStack", 40)
+    assert not looks_like_bin_stat_field("LastMajorChangeMajorPatchVersion", 13)
+    assert not looks_like_bin_stat_field("ShopOrderPriority", 2)
+    assert not looks_like_bin_stat_field("mCanBeSold", True)
+
+
+def test_bin_mana_agrees_with_ddragon_and_is_kept(mapper, dd_data, bin_data):
+    """bin 其實有法力（小寫 flatMPPoolMod，15 件）——「bin 完全不存法力」
+    是舊的錯誤結論。bin 值優先、DD 只補缺，一致性檢查涵蓋法力。"""
+    items = mapper.map_all(dd_data, bin_data)
+    lost_chapter = next(i for i in items if i.item_id == 6655)
+    assert lost_chapter.amount_of(StatKey.MANA) == 600.0

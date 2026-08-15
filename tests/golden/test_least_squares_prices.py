@@ -17,28 +17,34 @@ from lolcp.infrastructure.mapping import ItemMapper
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "16.15.1"
 
+# 盲點修復（2026-08-15）後重解：矩陣 199×25，新增穿甲／全能吸血／
+# 魔回欄位，全部單價因此位移。穿甲 NNLS 33.7 與扣除法 30.0 互相印證。
 EXPECTED = {
-    StatKey.ABILITY_HASTE: 29.129744674632903,
-    StatKey.AD: 37.92444300496639,
-    StatKey.AP: 21.90938971522314,
-    StatKey.ARMOR: 23.530691612942334,
-    StatKey.ARMOR_PEN_PERCENT: 26.751674612493645,  # 低信賴
-    StatKey.ATTACK_SPEED: 25.655047512944066,
-    StatKey.BASE_HP_REGEN: 0.9108732300245178,
-    StatKey.CRIT_CHANCE: 38.99035474991235,
+    StatKey.ABILITY_HASTE: 25.49551156955071,
+    StatKey.AD: 34.49684452064819,
+    StatKey.AP: 21.763464710569853,
+    StatKey.ARMOR: 24.05586807238905,
+    StatKey.ARMOR_PEN_FLAT: 33.72169217896334,
+    StatKey.ARMOR_PEN_PERCENT: 30.03427491659117,  # 低信賴
+    StatKey.ATTACK_SPEED: 27.143080099020466,
+    StatKey.BASE_HP_REGEN: 0.0,
+    StatKey.BASE_MP_REGEN: 2.2041862207918674,
+    StatKey.CRIT_CHANCE: 41.622901508000666,
     StatKey.CRIT_DAMAGE: 0.0,  # 低信賴
-    StatKey.HEAL_SHIELD_POWER: 105.194963754671,
-    StatKey.HP: 3.0314432726425617,
-    StatKey.HP_REGEN_FLAT: 124.6614800734326,  # 低信賴
-    StatKey.LIFE_STEAL: 36.990005156804806,
-    StatKey.MAGIC_PEN_FLAT: 39.89996628032621,  # 低信賴
-    StatKey.MAGIC_PEN_PERCENT: 24.503115869268825,  # 低信賴
-    StatKey.MAGIC_RESIST: 21.17346169163412,
-    StatKey.MANA: 0.9339979108912655,
-    StatKey.MOVE_SPEED_FLAT: 8.992174848872494,
-    StatKey.MOVE_SPEED_PERCENT: 55.28641197598388,
-    StatKey.SLOW_RESIST: 18.900605405269552,  # 低信賴
-    StatKey.TENACITY: 27.565483415860513,
+    StatKey.HEAL_SHIELD_POWER: 87.69347351175705,
+    StatKey.HP: 3.1484556229580254,
+    StatKey.HP_REGEN_FLAT: 119.82346943538934,  # 低信賴
+    StatKey.LIFE_STEAL: 52.66609344006688,
+    StatKey.MAGIC_PEN_FLAT: 42.55726189912084,  # 低信賴
+    StatKey.MAGIC_PEN_PERCENT: 25.59710662625139,  # 低信賴
+    StatKey.MAGIC_RESIST: 21.88364614333552,
+    StatKey.MANA: 1.0232288369564027,
+    StatKey.MOVE_SPEED_FLAT: 8.265187237134157,
+    StatKey.MOVE_SPEED_PERCENT: 42.20059245095754,
+    StatKey.MP_REGEN_FLAT: 0.0,  # 低信賴
+    StatKey.OMNIVAMP: 27.61891582373378,
+    StatKey.SLOW_RESIST: 20.201301397484364,  # 低信賴
+    StatKey.TENACITY: 27.40824305794396,
 }
 
 
@@ -65,10 +71,10 @@ def test_all_prices_are_non_negative(solved):
         assert table.unit_price(stat) >= 0.0, stat
 
 
-def test_matrix_covers_the_twentyone_summoners_rift_stats(solved):
+def test_matrix_covers_the_twentyfive_summoners_rift_stats(solved):
     table, _deriver, _diag, _items = solved
     assert table.priced_stats <= SR_STATS
-    assert len(table.priced_stats) >= 18  # fixture 裁剪後可能略少於 21
+    assert len(table.priced_stats) >= 22  # fixture 裁剪後可能略少於 25
 
 
 def test_rare_stats_are_flagged(solved):

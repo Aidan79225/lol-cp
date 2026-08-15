@@ -38,6 +38,8 @@ UNPRICED = [
     StatKey.CRIT_DAMAGE, StatKey.HP_REGEN_FLAT,
     StatKey.MOVE_SPEED_PERCENT, StatKey.HEAL_SHIELD_POWER, StatKey.TENACITY,
     StatKey.SLOW_RESIST, StatKey.MAGIC_PEN_FLAT, StatKey.MAGIC_PEN_PERCENT,
+    StatKey.ARMOR_PEN_FLAT,   # 盲點修復後現身；下一步將設扣除錨（殘暴之力）
+    StatKey.OMNIVAMP, StatKey.BASE_MP_REGEN, StatKey.MP_REGEN_FLAT,
 ]
 
 
