@@ -54,6 +54,8 @@ class ItemTableModel(QAbstractTableModel):
     ):
         if role != Qt.ItemDataRole.DisplayRole or orientation != Qt.Orientation.Horizontal:
             return None
+        if not 0 <= section < len(self.COLUMNS):  # 負值會被 Python 索引繞回，一併擋掉
+            return None
         return self.COLUMNS[section]
 
     def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole):
@@ -94,6 +96,21 @@ class ItemTableModel(QAbstractTableModel):
         key = keys.get(column)
         if key is None:
             return
+        # 排序必須重映射 persistent index，否則 QTableView 的選取列
+        # 在點表頭後會悄悄指到別件裝備（QItemSelectionModel 內部
+        # 依賴 persistent index）。
         self.layoutAboutToBeChanged.emit()
-        self._rows.sort(key=key, reverse=order == Qt.SortOrder.DescendingOrder)
+        old_rows = self._rows
+        self._rows = sorted(
+            old_rows, key=key, reverse=order == Qt.SortOrder.DescendingOrder
+        )
+        new_row_of = {id(c): r for r, c in enumerate(self._rows)}
+        stale = self.persistentIndexList()
+        self.changePersistentIndexList(
+            stale,
+            [
+                self.index(new_row_of[id(old_rows[p.row()])], p.column())
+                for p in stale
+            ],
+        )
         self.layoutChanged.emit()

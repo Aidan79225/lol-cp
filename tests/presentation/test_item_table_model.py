@@ -108,3 +108,24 @@ def test_data_returns_none_for_invalid_index(model):
     from PySide6.QtCore import QModelIndex
 
     assert model.data(QModelIndex()) is None
+
+
+def test_header_data_tolerates_out_of_range_sections(model):
+    role = Qt.ItemDataRole.DisplayRole
+    assert model.headerData(99, Qt.Orientation.Horizontal, role) is None
+    assert model.headerData(-1, Qt.Orientation.Horizontal, role) is None
+
+
+def test_sort_remaps_persistent_indexes(model):
+    """QItemSelectionModel 依賴 persistent index —— 排序後選取列
+    必須仍指向同一件裝備，而非同一個列號。"""
+    from PySide6.QtCore import QPersistentModelIndex
+
+    selected = QPersistentModelIndex(model.index(0, ItemTableModel.COL_NAME))
+    assert model.data(selected) == "無盡之刃"
+
+    model.sort(ItemTableModel.COL_CANONICAL, Qt.SortOrder.DescendingOrder)
+
+    assert selected.isValid()
+    assert selected.row() == 1  # 三相之力排到第 0 列，無盡之刃移到第 1 列
+    assert model.data(model.index(selected.row(), ItemTableModel.COL_NAME)) == "無盡之刃"
