@@ -7,7 +7,7 @@ from pathlib import Path
 
 from lolcp.domain.pricing import AnchorConfig, AnchorEntry
 from lolcp.domain.stats import StatKey
-from lolcp.domain.weights import RoleDefaults, StatWeights
+from lolcp.domain.weights import ChampionOverrides, RoleDefaults, StatWeights
 
 
 class ConfigError(ValueError):
@@ -53,3 +53,18 @@ def _parse_weights(role: str, body: object) -> StatWeights:
 def load_role_defaults(path: Path) -> RoleDefaults:
     raw = _read_toml(path)
     return RoleDefaults({role: _parse_weights(role, body) for role, body in raw.items()})
+
+
+def load_champion_overrides(directory: Path) -> ChampionOverrides:
+    """讀取 config/champions/*.toml。檔名主幹即英雄 key（Data Dragon 的 en_US key）。
+
+    目錄不存在或沒有檔案都是正常狀態 —— 多數英雄不需要覆寫。
+    """
+    if not directory.is_dir():
+        return ChampionOverrides({})
+    by_champion: dict[str, dict[StatKey, float]] = {}
+    for path in sorted(directory.glob("*.toml")):
+        raw = _read_toml(path)
+        weights = _parse_weights(path.stem, raw)
+        by_champion[path.stem] = dict(weights.weights)
+    return ChampionOverrides(by_champion)

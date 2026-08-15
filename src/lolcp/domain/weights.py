@@ -15,6 +15,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from lolcp.domain.diagnostics import Diagnostics
+from lolcp.domain.entities import Champion
 from lolcp.domain.stats import StatKey
 
 KNOWN_ROLES: tuple[str, ...] = (
@@ -68,3 +69,58 @@ class RoleDefaults:
                 continue
             merged = weights if merged is None else merged.union_max(weights)
         return merged if merged is not None else StatWeights.uniform()
+
+
+class ResourceRule:
+    """非法力英雄的法力權重歸零。
+
+    判斷依據是 en_US 的 partype 而非 stats.mp —— 犽宿 mp=100 但資源是
+    Flow，法力裝備對他完全無用。partype 判斷涵蓋 33 隻，mp==0 只涵蓋 11 隻。
+    """
+
+    def __init__(self, diagnostics: Diagnostics) -> None:
+        self._diagnostics = diagnostics
+
+    def apply(self, weights: StatWeights, champion: Champion) -> StatWeights:
+        if champion.partype_unknown:
+            self._diagnostics.unknown_partype(champion.key)
+            return weights
+        if champion.uses_mana:
+            return weights
+        return weights.with_stat(StatKey.MANA, 0.0)
+
+
+@dataclass(frozen=True)
+class ChampionOverrides:
+    by_champion: Mapping[str, Mapping[StatKey, float]]
+
+    def apply(self, weights: StatWeights, champion_key: str) -> StatWeights:
+        overrides = self.by_champion.get(champion_key)
+        return weights if not overrides else weights.merged_with(overrides)
+
+
+class WeightResolver:
+    """三層解析。新增英雄成本為零 —— tags 自動給出預設。
+
+    順序固定：角色預設 → 資源規則 → 手動覆寫。
+    覆寫在最後，因此可以蓋掉資源規則的歸零。
+    """
+
+    def __init__(
+        self,
+        role_defaults: RoleDefaults,
+        resource_rule: ResourceRule,
+        overrides: ChampionOverrides,
+        diagnostics: Diagnostics,
+    ) -> None:
+        self._role_defaults = role_defaults
+        self._resource_rule = resource_rule
+        self._overrides = overrides
+        self._diagnostics = diagnostics
+
+    def resolve(self, champion: Champion | None) -> StatWeights:
+        if champion is None:
+            return StatWeights.uniform()  # 全域客觀視角
+        weights = self._role_defaults.union_max(champion.tags, self._diagnostics)
+        weights = self._resource_rule.apply(weights, champion)
+        return self._overrides.apply(weights, champion.key)
