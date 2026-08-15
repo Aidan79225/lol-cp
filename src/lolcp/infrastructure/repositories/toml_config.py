@@ -28,11 +28,15 @@ def load_anchors(path: Path) -> AnchorConfig:
         stat = StatKey.from_config_key(key)  # 未知鍵擲 UnknownStatKeyError
         if not isinstance(body, dict) or "item_id" not in body:
             raise ConfigError(f"錨定項 {key!r} 缺少 item_id")
+        deduct_raw = body.get("deduct", [])
+        if not isinstance(deduct_raw, list):
+            raise ConfigError(f"錨定項 {key!r} 的 deduct 必須是陣列")
         entries.append(
             AnchorEntry(
                 stat=stat,
                 item_id=int(body["item_id"]),
                 reason=str(body.get("reason", "")),
+                deduct=tuple(StatKey.from_config_key(d) for d in deduct_raw),
             )
         )
     return AnchorConfig(entries=tuple(entries))

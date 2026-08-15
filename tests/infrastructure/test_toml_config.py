@@ -60,3 +60,43 @@ def test_missing_item_id_is_rejected(tmp_path):
 def test_missing_file_is_rejected(tmp_path):
     with pytest.raises(ConfigError, match="不存在"):
         load_anchors(tmp_path / "nope.toml")
+
+
+def test_deduct_list_is_parsed_into_stat_keys(tmp_path):
+    toml = tmp_path / "anchors.toml"
+    toml.write_text(
+        '[ad]\nitem_id = 1036\nreason = "純錨"\n\n'
+        '[life_steal]\nitem_id = 1053\ndeduct = ["ad"]\nreason = "扣除錨"\n',
+        encoding="utf-8",
+    )
+    entry = load_anchors(toml).for_stat(StatKey.LIFE_STEAL)
+    assert entry is not None
+    assert entry.deduct == (StatKey.AD,)
+
+
+def test_omitted_deduct_defaults_to_empty(tmp_path):
+    toml = tmp_path / "anchors.toml"
+    toml.write_text('[ad]\nitem_id = 1036\nreason = "純錨"\n', encoding="utf-8")
+    entry = load_anchors(toml).for_stat(StatKey.AD)
+    assert entry.deduct == ()
+
+
+def test_unknown_deduct_key_is_rejected_with_valid_options(tmp_path):
+    toml = tmp_path / "anchors.toml"
+    toml.write_text(
+        '[life_steal]\nitem_id = 1053\ndeduct = ["attak_speed"]\nreason = "typo"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(UnknownStatKeyError) as exc:
+        load_anchors(toml)
+    assert "attack_speed" in str(exc.value)
+
+
+def test_non_list_deduct_is_rejected(tmp_path):
+    toml = tmp_path / "anchors.toml"
+    toml.write_text(
+        '[life_steal]\nitem_id = 1053\ndeduct = "ad"\nreason = "非陣列"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="陣列"):
+        load_anchors(toml)
