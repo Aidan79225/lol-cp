@@ -165,3 +165,22 @@ def test_status_bar_surfaces_diagnostics():
     )
     assert "未知屬性欄位" in widget.text()
     assert "過濾變體" in widget.text()
+
+
+def test_zero_residual_is_neither_passive_nor_bargain():
+    fair = Item(item_id=1, name="公道", total_gold=350, sell_gold=175,
+                stats=(StatLine(StatKey.AD, 10.0),), tags=(), icon="", recipe=())
+    result = evaluate(fair, StatWeights.uniform(), {StatKey.AD: 35.0})
+    text = "\n".join(DetailPanel.render_lines(result))
+    assert "恰好定價" in text
+    assert "被動" not in text and "超值" not in text
+
+
+def test_float_noise_residual_is_treated_as_zero():
+    """扣除錨裝備（吸血鬼權杖）的殘差是 ±1e-13 浮點雜訊，
+    不可顯示成「+0g（被動…）」或「-0g（超值）」。"""
+    noisy = Item(item_id=1, name="雜訊", total_gold=900, sell_gold=450,
+                 stats=(StatLine(StatKey.LIFE_STEAL, 7.0),), tags=(), icon="", recipe=())
+    result = evaluate(noisy, StatWeights.uniform(), {StatKey.LIFE_STEAL: 900 / 7.0})
+    text = "\n".join(DetailPanel.render_lines(result))
+    assert "恰好定價" in text

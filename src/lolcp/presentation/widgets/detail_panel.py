@@ -61,9 +61,12 @@ class DetailPanel(QWidget):
             f" = {result.ratio * 100:.1f}%",
         ]
 
-        if result.residual_is_passive_value:
-            lines.append(f"殘差 +{result.residual:.0f}g（至少這些金幣花在被動效果上）")
+        residual = round(result.residual)  # 顯示取整；扣除錨的 ±1e-13 浮點雜訊歸零
+        if residual > 0:
+            lines.append(f"殘差 +{residual}g（至少這些金幣花在被動效果上）")
+        elif residual < 0:
+            lines.append(f"殘差 {residual}g（屬性本身已超值）")
         else:
-            lines.append(f"殘差 {result.residual:.0f}g（屬性本身已超值）")
+            lines.append("殘差 0g（屬性恰好定價）")
 
         return lines
