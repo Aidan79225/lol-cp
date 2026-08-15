@@ -24,6 +24,8 @@ from lolcp.infrastructure.repositories.toml_config import (
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "16.15.1"
 CONFIG = Path(__file__).parent.parent.parent / "config"
+# champions/ 是使用者可變資料（權重拉桿會寫入），黃金測試讀凍結複本
+FROZEN_CHAMPIONS = Path(__file__).parent.parent / "fixtures" / "config" / "champions"
 
 IE, TRIFORCE, ZHONYA, BOTRK = 3031, 3078, 3157, 3153
 
@@ -60,7 +62,7 @@ def engine():
     resolver = WeightResolver(
         role_defaults=load_role_defaults(CONFIG / "role_defaults.toml"),
         resource_rule=ResourceRule(diagnostics),
-        overrides=load_champion_overrides(CONFIG / "champions"),
+        overrides=load_champion_overrides(FROZEN_CHAMPIONS),
         diagnostics=diagnostics,
     )
     champions = {"Draven": DRAVEN, "Kayle": KAYLE, None: None}
@@ -116,13 +118,18 @@ def test_crit_damage_is_the_unpriced_stat_on_infinity_edge(engine):
     assert result.unpriced == (StatKey.CRIT_DAMAGE,)
 
 
-def test_vampiric_scepter_is_locked_to_exactly_100_percent(engine):
+@pytest.mark.parametrize(
+    "anchor_item_id", [1053, 3035], ids=["吸血鬼權杖", "最後耳語"]
+)
+def test_deduction_anchor_items_are_locked_to_exactly_100_percent(engine, anchor_item_id):
     """扣除錨的固有代價：錨定裝備自身 CP值 恆為 100%、殘差 0。
 
-    這個黃金值同時驗證扣除法的算式 —— 若單價不是 375/7，比率不會是 1。
+    這個黃金值同時驗證扣除法的算式 —— 單價錯了比率就不會是 1。
     """
     by_id, prices, resolver, _ = engine
-    result = LinearValuation().evaluate(by_id[1053], prices, resolver.resolve(None))
+    result = LinearValuation().evaluate(
+        by_id[anchor_item_id], prices, resolver.resolve(None)
+    )
     assert result.ratio == pytest.approx(1.0)
     assert result.residual == pytest.approx(0.0, abs=1e-9)
     assert result.unpriced == ()

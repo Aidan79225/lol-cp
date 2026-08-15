@@ -8,7 +8,8 @@ from lolcp.infrastructure.repositories.toml_config import (
     load_champion_overrides,
 )
 
-CHAMPIONS_DIR = Path(__file__).parent.parent.parent / "config" / "champions"
+# champions/ 是使用者可變資料（權重拉桿會寫入），測試讀凍結複本
+CHAMPIONS_DIR = Path(__file__).parent.parent / "fixtures" / "config" / "champions"
 
 
 def test_loads_kayle_override():

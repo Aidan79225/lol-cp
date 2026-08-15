@@ -18,6 +18,8 @@ from lolcp.infrastructure.repositories.toml_config import (
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "16.15.1"
 CONFIG = Path(__file__).parent.parent.parent / "config"
+# champions/ 是使用者可變資料（權重拉桿會寫入），測試讀凍結複本
+FROZEN_CHAMPIONS = Path(__file__).parent.parent / "fixtures" / "config" / "champions"
 
 DRAVEN = Champion("Draven", 119, "達瑞文", ("Marksman",), "Mana")
 
@@ -33,7 +35,7 @@ def use_case():
         weight_resolver=WeightResolver(
             role_defaults=load_role_defaults(CONFIG / "role_defaults.toml"),
             resource_rule=ResourceRule(diagnostics),
-            overrides=load_champion_overrides(CONFIG / "champions"),
+            overrides=load_champion_overrides(FROZEN_CHAMPIONS),
             diagnostics=diagnostics,
         ),
         valuation=LinearValuation(),

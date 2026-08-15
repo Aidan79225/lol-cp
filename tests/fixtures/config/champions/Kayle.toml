@@ -1,0 +1,13 @@
+# 凱爾 — tags = ['Mage', 'Marksman']
+#
+# Mage ∪ Marksman 的聯集已正確捕捉混合傷害：
+#   ad 1.0  ap 1.0  attack_speed 1.0  crit_chance 1.0  ability_haste 1.0
+# 這正是 union_max 取 max 而非平均的價值所在。
+#
+# 唯一需要調整的是物穿：後期傷害大半來自 E 的魔法傷害與 R，
+# Marksman 預設的 0.8 偏高。
+armor_pen_percent = 0.4
+
+# armor_pen_flat 在召喚峽谷可購買裝備中未出現（見 spec §5.3），
+# 因此這行對 SR 分析無實際影響，僅記錄判斷以免日後 Riot 新增此類裝備時漏改。
+armor_pen_flat = 0.4
