@@ -77,12 +77,20 @@ def test_cdragon_accepts_major_minor_but_not_the_full_version(gateway, latest):
         assert response.status == 200
 
     bad_url = BIN_TEMPLATE.format(base=CDRAGON_BASE, version=latest)
-    with pytest.raises(urllib.error.HTTPError):
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
         urllib.request.urlopen(head(bad_url), timeout=60)
+    assert excinfo.value.code == 404  # 403 之類代表別的事變了，不可混為一談
 
 
 def test_bin_still_carries_ability_haste_and_lacks_mana(gateway, latest):
-    """兩個關鍵事實：bin 有 Data Dragon 缺的技能加速，且完全不存法力。"""
+    """兩個關鍵事實：bin 有 Data Dragon 缺的技能加速，且完全不存法力。
+
+    欄位偵測沿用 mapping.looks_like_bin_stat_field 的廣義形態判斷，
+    而非寫死 mFlat/mPercent/mAbility 前綴 —— 寫死前綴會讓
+    「提早發現 Riot 新屬性」的目的形同虛設（如 mOmnivampMod 會漏接）。
+    """
+    from lolcp.infrastructure.mapping import looks_like_bin_stat_field
+
     url = BIN_TEMPLATE.format(
         base=CDRAGON_BASE, version=HttpPatchGateway.cdragon_version(latest)
     )
@@ -91,8 +99,8 @@ def test_bin_still_carries_ability_haste_and_lacks_mana(gateway, latest):
         field
         for entry in payload.values()
         if isinstance(entry, dict)
-        for field in entry
-        if field.startswith(("mFlat", "mPercent", "mAbility"))
+        for field, value in entry.items()
+        if looks_like_bin_stat_field(field, value)
     }
     assert "mAbilityHasteMod" in stat_fields
     assert "mFlatCritDamageMod" in stat_fields
