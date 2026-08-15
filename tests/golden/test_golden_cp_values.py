@@ -14,7 +14,7 @@ from lolcp.domain.entities import Champion
 from lolcp.domain.pricing import CanonicalDeriver
 from lolcp.domain.stats import StatKey
 from lolcp.domain.valuation import LinearValuation
-from lolcp.domain.weights import ChampionOverrides, ResourceRule, WeightResolver
+from lolcp.domain.weights import ResourceRule, WeightResolver
 from lolcp.infrastructure.mapping import ItemMapper
 from lolcp.infrastructure.repositories.toml_config import (
     load_anchors,
