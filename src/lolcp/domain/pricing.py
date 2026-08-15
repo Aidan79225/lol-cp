@@ -29,11 +29,16 @@ class AnchorEntry:
 
     item_id 一律為數值 ID。以名稱查找會拿到其他模式的變體
     （長劍 1036 是 350g，771036 是 400g），單價全錯且不報錯。
+
+    deduct 非空即為「扣除錨」：單價 = (總價 − Σ 扣除屬性量 × 純錨單價)
+    ÷ 目標屬性量。用於沒有純屬性基礎裝備的屬性（如吸血）。
+    deduct 只能引用純錨定屬性（單層依賴，見 spec 2026-08-15 §5）。
     """
 
     stat: StatKey
     item_id: int
     reason: str
+    deduct: tuple[StatKey, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -92,17 +97,73 @@ class CanonicalDeriver:
     def derive(self, items: Sequence[Item]) -> PriceTable:
         by_id = {i.item_id: i for i in items}
         prices: dict[StatKey, float | None] = {stat: None for stat in StatKey}
-        for entry in self._anchors.entries:
+        pure = [e for e in self._anchors.entries if not e.deduct]
+        derived = [e for e in self._anchors.entries if e.deduct]
+        for entry in pure:
             prices[entry.stat] = self._price_from_anchor(entry, by_id)
+        pure_stats = frozenset(e.stat for e in pure)
+        for entry in derived:
+            prices[entry.stat] = self._price_by_deduction(
+                entry, by_id, prices, pure_stats
+            )
         return PriceTable(prices=prices, low_confidence=frozenset())
 
     def _price_from_anchor(self, entry: AnchorEntry, by_id: dict[int, Item]) -> float:
+        anchor = self._anchor_item(entry, by_id)
+        return anchor.total_gold / self._target_amount(entry, anchor)
+
+    def _price_by_deduction(
+        self,
+        entry: AnchorEntry,
+        by_id: dict[int, Item],
+        prices: dict[StatKey, float | None],
+        pure_stats: frozenset[StatKey],
+    ) -> float:
+        """扣除法（spec 2026-08-15 §5）：三道嚴格驗證，任一不符即大聲失敗。
+
+        Riot 改動錨定裝備的屬性組成時要在啟動時炸掉，
+        絕不靜默產生漂移的單價。
+        """
+        anchor = self._anchor_item(entry, by_id)
+
+        expected = frozenset((entry.stat, *entry.deduct))
+        if expected != anchor.stat_keys:
+            missing = sorted(s.name for s in expected - anchor.stat_keys)
+            extra = sorted(s.name for s in anchor.stat_keys - expected)
+            raise AnchorItemMissingError(
+                f"扣除錨 {entry.item_id}（{anchor.name}）屬性集合不符："
+                f"deduct 多列了 {missing or '無'}、裝備多出 {extra or '無'}。"
+                f"Riot 可能改動了該裝備，需更新 anchors.toml。"
+            )
+
+        outside = sorted(s.name for s in entry.deduct if s not in pure_stats)
+        if outside:
+            raise AnchorItemMissingError(
+                f"扣除錨 {entry.item_id}（{anchor.name}）的 deduct {outside} "
+                f"不是純錨定屬性 —— deduct 只能引用純錨定（單層依賴）。"
+            )
+
+        remainder = anchor.total_gold - sum(
+            anchor.amount_of(s) * prices[s] for s in entry.deduct
+        )
+        if remainder <= 0:
+            raise AnchorItemMissingError(
+                f"扣除錨 {entry.item_id}（{anchor.name}）扣除後殘額 "
+                f"{remainder:g} ≤ 0，錨定假設已崩壞，無法定價。"
+            )
+        return remainder / self._target_amount(entry, anchor)
+
+    def _anchor_item(self, entry: AnchorEntry, by_id: dict[int, Item]) -> Item:
         anchor = by_id.get(entry.item_id)
         if anchor is None:
             raise AnchorItemMissingError(
                 f"錨定裝備 {entry.item_id} 不存在於當前版本"
                 f"（{entry.stat.config_key}）。Riot 可能已移除該裝備，需更新 anchors.toml。"
             )
+        return anchor
+
+    @staticmethod
+    def _target_amount(entry: AnchorEntry, anchor: Item) -> float:
         amount = anchor.amount_of(entry.stat)
         if amount is None:
             raise AnchorItemMissingError(
@@ -114,7 +175,7 @@ class CanonicalDeriver:
                 f"錨定裝備 {entry.item_id}（{anchor.name}）的 "
                 f"{entry.stat.name} 數量為 0，無法作為分母。"
             )
-        return anchor.total_gold / amount
+        return amount
 
 
 class LeastSquaresDeriver:

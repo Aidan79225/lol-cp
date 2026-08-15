@@ -82,3 +82,121 @@ def test_canonical_has_no_low_confidence_stats():
     items = [item(1036, 350, StatLine(StatKey.AD, 10.0))]
     table = CanonicalDeriver(anchors((StatKey.AD, 1036)), Diagnostics()).derive(items)
     assert table.low_confidence == frozenset()
+
+
+def test_deduction_anchor_prices_the_remainder():
+    """吸血鬼權杖 (900 − 15AD×35) / 7 = 53.571... 每 1%。"""
+    items = [
+        item(1036, 350, StatLine(StatKey.AD, 10.0)),
+        item(1053, 900, StatLine(StatKey.AD, 15.0), StatLine(StatKey.LIFE_STEAL, 7.0)),
+    ]
+    config = AnchorConfig((
+        AnchorEntry(StatKey.AD, 1036, "test"),
+        AnchorEntry(StatKey.LIFE_STEAL, 1053, "test", deduct=(StatKey.AD,)),
+    ))
+    table = CanonicalDeriver(config, Diagnostics()).derive(items)
+    assert table.unit_price(StatKey.LIFE_STEAL) == pytest.approx(375 / 7)
+
+
+def test_deduction_entry_order_in_config_does_not_matter():
+    """扣除錨寫在它依賴的純錨之前也要能解 —— 兩趟推導與設定順序無關。"""
+    items = [
+        item(1036, 350, StatLine(StatKey.AD, 10.0)),
+        item(1053, 900, StatLine(StatKey.AD, 15.0), StatLine(StatKey.LIFE_STEAL, 7.0)),
+    ]
+    config = AnchorConfig((
+        AnchorEntry(StatKey.LIFE_STEAL, 1053, "test", deduct=(StatKey.AD,)),
+        AnchorEntry(StatKey.AD, 1036, "test"),
+    ))
+    table = CanonicalDeriver(config, Diagnostics()).derive(items)
+    assert table.unit_price(StatKey.LIFE_STEAL) == pytest.approx(375 / 7)
+
+
+def test_extra_stat_on_deduction_anchor_fails_loudly():
+    """Riot 幫權杖加了新屬性 —— 目標∪deduct 必須恰好等於裝備全屬性。"""
+    items = [
+        item(1036, 350, StatLine(StatKey.AD, 10.0)),
+        item(1053, 900, StatLine(StatKey.AD, 15.0), StatLine(StatKey.LIFE_STEAL, 7.0),
+             StatLine(StatKey.HP, 100.0)),
+    ]
+    config = AnchorConfig((
+        AnchorEntry(StatKey.AD, 1036, "test"),
+        AnchorEntry(StatKey.LIFE_STEAL, 1053, "test", deduct=(StatKey.AD,)),
+    ))
+    with pytest.raises(AnchorItemMissingError, match="屬性集合"):
+        CanonicalDeriver(config, Diagnostics()).derive(items)
+
+
+def test_deduct_listing_a_stat_the_item_lacks_fails_loudly():
+    items = [
+        item(1036, 350, StatLine(StatKey.AD, 10.0)),
+        item(1018, 600, StatLine(StatKey.CRIT_CHANCE, 15.0)),
+        item(1053, 900, StatLine(StatKey.AD, 15.0), StatLine(StatKey.LIFE_STEAL, 7.0)),
+    ]
+    config = AnchorConfig((
+        AnchorEntry(StatKey.AD, 1036, "test"),
+        AnchorEntry(StatKey.CRIT_CHANCE, 1018, "test"),
+        AnchorEntry(StatKey.LIFE_STEAL, 1053, "test",
+                    deduct=(StatKey.AD, StatKey.CRIT_CHANCE)),
+    ))
+    with pytest.raises(AnchorItemMissingError, match="屬性集合"):
+        CanonicalDeriver(config, Diagnostics()).derive(items)
+
+
+def test_deduct_referencing_an_unanchored_stat_fails_loudly():
+    """單層依賴：deduct 只能引用設定內的純錨定屬性。"""
+    items = [
+        item(1053, 900, StatLine(StatKey.AD, 15.0), StatLine(StatKey.LIFE_STEAL, 7.0)),
+    ]
+    config = AnchorConfig((
+        AnchorEntry(StatKey.LIFE_STEAL, 1053, "test", deduct=(StatKey.AD,)),
+    ))
+    with pytest.raises(AnchorItemMissingError, match="純錨定"):
+        CanonicalDeriver(config, Diagnostics()).derive(items)
+
+
+def test_deduct_referencing_another_deduction_anchor_fails_loudly():
+    """扣除錨引用扣除錨也違反單層依賴，同樣要炸。"""
+    items = [
+        item(1036, 350, StatLine(StatKey.AD, 10.0)),
+        item(1053, 900, StatLine(StatKey.AD, 15.0), StatLine(StatKey.LIFE_STEAL, 7.0)),
+        item(3172, 1100, StatLine(StatKey.LIFE_STEAL, 5.0), StatLine(StatKey.TENACITY, 20.0)),
+    ]
+    config = AnchorConfig((
+        AnchorEntry(StatKey.AD, 1036, "test"),
+        AnchorEntry(StatKey.LIFE_STEAL, 1053, "test", deduct=(StatKey.AD,)),
+        AnchorEntry(StatKey.TENACITY, 3172, "test", deduct=(StatKey.LIFE_STEAL,)),
+    ))
+    with pytest.raises(AnchorItemMissingError, match="純錨定"):
+        CanonicalDeriver(config, Diagnostics()).derive(items)
+
+
+def test_nonpositive_remainder_fails_loudly():
+    """扣完 ≤ 0 代表錨定假設崩壞，不可產生負單價或零單價。"""
+    items = [
+        item(1036, 350, StatLine(StatKey.AD, 10.0)),
+        item(1053, 400, StatLine(StatKey.AD, 15.0), StatLine(StatKey.LIFE_STEAL, 7.0)),
+    ]
+    config = AnchorConfig((
+        AnchorEntry(StatKey.AD, 1036, "test"),
+        AnchorEntry(StatKey.LIFE_STEAL, 1053, "test", deduct=(StatKey.AD,)),
+    ))
+    with pytest.raises(AnchorItemMissingError, match="殘額"):
+        CanonicalDeriver(config, Diagnostics()).derive(items)
+
+
+def test_exactly_zero_remainder_also_fails():
+    items = [
+        item(1036, 350, StatLine(StatKey.AD, 10.0)),
+        item(1053, 525, StatLine(StatKey.AD, 15.0), StatLine(StatKey.LIFE_STEAL, 7.0)),
+    ]
+    config = AnchorConfig((
+        AnchorEntry(StatKey.AD, 1036, "test"),
+        AnchorEntry(StatKey.LIFE_STEAL, 1053, "test", deduct=(StatKey.AD,)),
+    ))
+    with pytest.raises(AnchorItemMissingError, match="殘額"):
+        CanonicalDeriver(config, Diagnostics()).derive(items)
+
+
+def test_pure_entries_default_to_empty_deduct():
+    assert AnchorEntry(StatKey.AD, 1036, "test").deduct == ()
