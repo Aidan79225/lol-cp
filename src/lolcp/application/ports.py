@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Protocol
 
 from lolcp.domain.entities import Champion, Item
+from lolcp.domain.stats import StatKey
+from lolcp.domain.weights import ChampionOverrides
 
 
 class ItemRepository(Protocol):
@@ -52,3 +54,11 @@ class CacheStore(Protocol):
     def commit(self, version: str, staging: Path) -> Path: ...
 
     def discard(self, staging: Path) -> None: ...
+
+
+class OverridesStore(Protocol):
+    def load(self) -> ChampionOverrides: ...
+
+    def set_weight(
+        self, champion_key: str, stat: StatKey, value: float | None
+    ) -> None: ...
