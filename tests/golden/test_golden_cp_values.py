@@ -35,17 +35,17 @@ EXPECTED = {
     (None, TRIFORCE): (109.5, -315.0, 0, 0),
     (None, IE): (103.6, -125.0, 1, 0),
     (None, ZHONYA): (95.4, 150.0, 0, 0),
-    (None, BOTRK): (63.3, 1175.0, 1, 0),
+    (None, BOTRK): (80.0, 639.3, 0, 0),         # 吸血以扣除法計價後不再是下限
 
     ("Draven", IE): (103.6, -125.0, 1, 0),      # 與全域相同：完全適配
     ("Draven", TRIFORCE): (82.2, 593.0, 0, 0),
-    ("Draven", BOTRK): (63.3, 1175.0, 1, 0),    # 與全域相同：低分與英雄無關
+    ("Draven", BOTRK): (80.0, 639.3, 0, 0),     # 與全域相同：AD/攻速/吸血權重皆 1.0
     ("Draven", ZHONYA): (9.2, 2950.0, 0, 1),    # 105 法強全遮罩
 
     ("Kayle", IE): (103.6, -125.0, 1, 0),
     ("Kayle", TRIFORCE): (98.8, 40.0, 0, 0),
     ("Kayle", ZHONYA): (80.0, 650.0, 0, 0),     # 聯集保住 AP，遮罩數為 0
-    ("Kayle", BOTRK): (63.3, 1175.0, 1, 0),
+    ("Kayle", BOTRK): (80.0, 639.3, 0, 0),      # Mage∪Marksman 聯集後同上
 }
 
 
@@ -114,3 +114,15 @@ def test_crit_damage_is_the_unpriced_stat_on_infinity_edge(engine):
     by_id, prices, resolver, _ = engine
     result = LinearValuation().evaluate(by_id[IE], prices, resolver.resolve(None))
     assert result.unpriced == (StatKey.CRIT_DAMAGE,)
+
+
+def test_vampiric_scepter_is_locked_to_exactly_100_percent(engine):
+    """扣除錨的固有代價：錨定裝備自身 CP值 恆為 100%、殘差 0。
+
+    這個黃金值同時驗證扣除法的算式 —— 若單價不是 375/7，比率不會是 1。
+    """
+    by_id, prices, resolver, _ = engine
+    result = LinearValuation().evaluate(by_id[1053], prices, resolver.resolve(None))
+    assert result.ratio == pytest.approx(1.0)
+    assert result.residual == pytest.approx(0.0, abs=1e-9)
+    assert result.unpriced == ()

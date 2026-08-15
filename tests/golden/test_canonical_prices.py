@@ -30,10 +30,11 @@ EXPECTED_PRICES = {
     StatKey.ABILITY_HASTE: 50.0,
     StatKey.MOVE_SPEED_FLAT: 12.0,
     StatKey.BASE_HP_REGEN: 3.0,     # 每 1% —— 正規化陷阱，不是 300.0
+    StatKey.LIFE_STEAL: 375 / 7,    # 53.571 每 1% —— 扣除錨：權杖 900 − 15AD×35
 }
 
 UNPRICED = [
-    StatKey.CRIT_DAMAGE, StatKey.HP_REGEN_FLAT, StatKey.LIFE_STEAL,
+    StatKey.CRIT_DAMAGE, StatKey.HP_REGEN_FLAT,
     StatKey.MOVE_SPEED_PERCENT, StatKey.HEAL_SHIELD_POWER, StatKey.TENACITY,
     StatKey.SLOW_RESIST, StatKey.MAGIC_PEN_FLAT, StatKey.MAGIC_PEN_PERCENT,
     StatKey.ARMOR_PEN_PERCENT,
@@ -66,5 +67,5 @@ def test_stats_without_anchors_stay_unpriced(price_table, stat):
     assert price_table.unit_price(stat) is None
 
 
-def test_exactly_eleven_stats_are_priced(price_table):
-    assert len(price_table.priced_stats) == 11
+def test_exactly_twelve_stats_are_priced(price_table):
+    assert len(price_table.priced_stats) == 12
