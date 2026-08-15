@@ -101,9 +101,12 @@ def test_champion_without_override_file_is_unaffected():
 
 
 def test_resolve_defaults_excludes_overrides():
-    """拉桿基準值 = 前兩層，不含覆寫。"""
-    weights = resolver({"Kayle": {StatKey.ARMOR_PEN_PERCENT: 0.4}}).resolve_defaults(
-        champion("Kayle", ("Mage", "Marksman"))
+    """拉桿基準值 = 前兩層，不含覆寫。
+
+    用純 Marksman 的達瑞文 —— 凱爾的聯集會因 Mage 未定義物穿
+    而取到 1.0（寧可多算原則），驗不到「排除覆寫」這件事。"""
+    weights = resolver({"Draven": {StatKey.ARMOR_PEN_PERCENT: 0.4}}).resolve_defaults(
+        champion("Draven", ("Marksman",))
     )
     assert weights.of(StatKey.ARMOR_PEN_PERCENT) == 0.8
 
