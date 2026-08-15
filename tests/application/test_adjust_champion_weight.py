@@ -1,5 +1,3 @@
-import pytest
-
 from lolcp.application.use_cases.adjust_champion_weight import AdjustChampionWeight
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import Champion
@@ -64,3 +62,13 @@ def test_returned_overrides_reflect_the_store():
     store, resolver = FakeStore(), make_resolver()
     overrides = AdjustChampionWeight(store, resolver).execute(DRAVEN, StatKey.AP, 0.3)
     assert overrides.by_champion["Draven"][StatKey.AP] == 0.3
+
+
+def test_noop_adjustment_leaves_store_untouched():
+    """按還原但本來就沒覆寫：不寫檔、不觸發重算（呼叫端以覆寫相等跳過）。"""
+    store, resolver = FakeStore(), make_resolver()
+    calls: list[tuple] = []
+    original = store.set_weight
+    store.set_weight = lambda *a: (calls.append(a), original(*a))
+    AdjustChampionWeight(store, resolver).execute(DRAVEN, StatKey.AP, 0.0)
+    assert calls == []

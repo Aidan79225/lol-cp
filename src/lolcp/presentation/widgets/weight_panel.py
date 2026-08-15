@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from lolcp.domain.entities import Champion
-from lolcp.domain.stats import StatKey
+from lolcp.domain.stats import SR_STATS, StatKey
 from lolcp.domain.weights import StatWeights
 
 _STEP = 0.05
@@ -35,6 +35,7 @@ class WeightPanel(QWidget):
         super().__init__(parent)
         self._defaults: StatWeights | None = None
         self._overrides: dict[StatKey, float] = {}
+        self._positions: dict[StatKey, int] = {}  # set_context 時的基準格位
         self._sliders: dict[StatKey, QSlider] = {}
         self._values: dict[StatKey, QLabel] = {}
         self._names: dict[StatKey, QLabel] = {}
@@ -45,11 +46,16 @@ class WeightPanel(QWidget):
 
         grid_host = QWidget(self)
         grid = QGridLayout(grid_host)
-        for row, stat in enumerate(StatKey):
+        # 只列 SR 屬性 —— 其餘 4 個 StatKey 不出現在召喚峽谷裝備上，
+        # 調了也不影響任何價格，是死拉桿。
+        for row, stat in enumerate(s for s in StatKey if s in SR_STATS):
             name = QLabel(stat.config_key, grid_host)
             slider = QSlider(Qt.Orientation.Horizontal, grid_host)
             slider.setRange(0, _STEPS)
-            slider.sliderReleased.connect(lambda s=stat: self._on_released(s))
+            slider.valueChanged.connect(
+                lambda position, s=stat: self._on_value_changed(s, position)
+            )
+            slider.sliderReleased.connect(lambda s=stat: self._commit(s))
             value = QLabel("", grid_host)
             reset = QPushButton("還原", grid_host)
             reset.clicked.connect(lambda _checked=False, s=stat: self._on_reset(s))
@@ -85,8 +91,10 @@ class WeightPanel(QWidget):
         for stat, slider in self._sliders.items():
             slider.setEnabled(editable)
             current = self._current(stat) if editable else 0.0
+            position = round(current / _STEP)
+            self._positions[stat] = position
             slider.blockSignals(True)
-            slider.setValue(round(current / _STEP))
+            slider.setValue(position)
             slider.blockSignals(False)
             self._values[stat].setText(f"{current:.2f}" if editable else "—")
             self._set_overridden_style(stat, editable and stat in self._overrides)
@@ -103,10 +111,24 @@ class WeightPanel(QWidget):
         font.setBold(overridden)
         self._names[stat].setFont(font)
 
-    def _on_released(self, stat: StatKey) -> None:
+    def _on_value_changed(self, stat: StatKey, position: int) -> None:
         if self._defaults is None:
             return
-        self.weight_committed.emit(stat, self._sliders[stat].value() * _STEP)
+        self._values[stat].setText(f"{position * _STEP:.2f}")
+        if not self._sliders[stat].isSliderDown():
+            self._commit(stat)  # 鍵盤／PageUp 等非拖曳改值不會發 sliderReleased
+
+    def _commit(self, stat: StatKey) -> None:
+        if self._defaults is None:
+            return
+        position = self._sliders[stat].value()
+        if position == self._positions.get(stat):
+            # 格位沒變就不提交 —— 點一下不拖動不可把手調值（如 0.87）
+            # 改寫成最近的 0.05 倍數。
+            self._values[stat].setText(f"{self._current(stat):.2f}")
+            return
+        self._positions[stat] = position  # 樂觀更新，避免 release 對同格位重複提交
+        self.weight_committed.emit(stat, position * _STEP)
 
     def _on_reset(self, stat: StatKey) -> None:
         if self._defaults is None:

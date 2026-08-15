@@ -57,3 +57,33 @@ def test_reset_all_emits_for_every_override():
     panel.weight_committed.connect(lambda s, v: seen.append(s))
     panel._on_reset_all()
     assert set(seen) == {StatKey.AP, StatKey.MANA}
+
+
+def test_panel_lists_only_sr_stats():
+    """25 個 StatKey 中只有 21 個出現在召喚峽谷裝備 —— 其餘 4 個
+    是死拉桿（調了也不影響任何價格），不該出現。"""
+    from lolcp.domain.stats import SR_STATS
+
+    panel = WeightPanel()
+    assert set(panel._sliders) == set(SR_STATS)
+
+
+def test_keyboard_value_change_commits_without_release():
+    """鍵盤方向鍵／PageUp 改值不會發 sliderReleased，也必須提交。"""
+    panel = WeightPanel()
+    panel.set_context(DRAVEN, defaults(), {})
+    seen: list[tuple[object, float]] = []
+    panel.weight_committed.connect(lambda s, v: seen.append((s, v)))
+    panel._sliders[StatKey.AP].setValue(7)  # 程式化改值 = 非拖曳路徑
+    assert seen == [(StatKey.AP, pytest.approx(0.35))]
+
+
+def test_click_without_move_does_not_overwrite_hand_edited_value():
+    """手調 0.87 不是 0.05 的倍數；只按一下不拖動不可把它改寫成 0.85。"""
+    panel = WeightPanel()
+    panel.set_context(DRAVEN, defaults(), {StatKey.AP: 0.87})
+    seen: list[tuple[object, float]] = []
+    panel.weight_committed.connect(lambda s, v: seen.append((s, v)))
+    panel._sliders[StatKey.AP].sliderReleased.emit()  # 點擊未移動
+    assert seen == []
+    assert panel._values[StatKey.AP].text() == "0.87"

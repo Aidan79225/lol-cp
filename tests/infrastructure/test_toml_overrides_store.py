@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from lolcp.domain.stats import StatKey
 from lolcp.infrastructure.repositories.toml_overrides_store import TomlOverridesStore
 
@@ -69,3 +67,13 @@ def test_store_satisfies_the_overrides_store_port():
         port_sig = inspect.signature(getattr(OverridesStore, name))
         impl_sig = inspect.signature(getattr(TomlOverridesStore, name))
         assert list(port_sig.parameters) == list(impl_sig.parameters)
+
+
+def test_trailing_comment_on_the_edited_line_is_preserved(tmp_path):
+    (tmp_path / "Draven.toml").write_text(
+        "ap = 0.5  # 手調：對線期常換血\n", encoding="utf-8"
+    )
+    store = TomlOverridesStore(tmp_path)
+    store.set_weight("Draven", StatKey.AP, 0.7)
+    text = (tmp_path / "Draven.toml").read_text(encoding="utf-8")
+    assert "ap = 0.7  # 手調：對線期常換血" in text

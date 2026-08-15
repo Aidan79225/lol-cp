@@ -40,10 +40,11 @@ class FakeApp:
 @pytest.fixture
 def coordinator(tmp_path):
     cache_root = tmp_path / "cache"
-    (cache_root / "16.15.1").mkdir(parents=True)
-    for f in (FIXTURES / "16.15.1").iterdir():
-        (cache_root / "16.15.1" / f.name).write_bytes(f.read_bytes())
-    (cache_root / "16.15.1" / ".complete").write_text("", encoding="utf-8")
+    for version in ("16.15.1", "16.16.1"):  # 第二個版本給版本切換測試用
+        (cache_root / version).mkdir(parents=True)
+        for f in (FIXTURES / "16.15.1").iterdir():
+            (cache_root / version / f.name).write_bytes(f.read_bytes())
+        (cache_root / version / ".complete").write_text("", encoding="utf-8")
 
     context = build_application(cache_root=cache_root)
     return AppCoordinator(
@@ -108,3 +109,13 @@ def test_failure_with_a_live_window_keeps_the_app_running(coordinator, monkeypat
     coordinator.on_finished(result())
     coordinator.on_failed("網路中斷")
     assert coordinator._app.quit_calls == 0
+
+
+def test_version_change_on_refresh_rebuilds_use_cases(coordinator):
+    """檢查更新帶回新版本時，set_use_cases 以三元組重建注入 —— 這行
+    只在版本切換時執行，沒測試的話元組數不符只會在真實改版時爆。"""
+    coordinator.on_finished(result("16.15.1"))
+    first = coordinator.window._list_valuations
+    coordinator.on_finished(result("16.16.1"))
+    assert coordinator.window._list_valuations is not first
+    assert coordinator.window._model.rowCount() > 0

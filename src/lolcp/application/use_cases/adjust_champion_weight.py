@@ -18,9 +18,20 @@ class AdjustChampionWeight:
     def execute(
         self, champion: Champion, stat: StatKey, value: float
     ) -> ChampionOverrides:
-        """調到基準值即移除覆寫 —— 「有覆寫」恆等於「與基準不同」。"""
+        """調到基準值即移除覆寫 —— 「有覆寫」恆等於「與基準不同」。
+
+        無實質變化時不寫檔也不重載（回傳原覆寫物件，呼叫端可用
+        相等性判斷跳過重算）。
+        """
         default = self._resolver.resolve_defaults(champion).of(stat)
         target = None if abs(value - default) < _EPS else value
+
+        current = self._resolver.overrides.by_champion.get(champion.key, {})
+        if target is None and stat not in current:
+            return self._resolver.overrides  # 本來就沒有覆寫
+        if target is not None and stat in current and abs(current[stat] - target) < _EPS:
+            return self._resolver.overrides  # 值沒變
+
         self._store.set_weight(champion.key, stat, target)
         overrides = self._store.load()
         self._resolver.replace_overrides(overrides)

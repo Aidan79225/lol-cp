@@ -33,7 +33,7 @@ class TomlOverridesStore:
             return
 
         pattern = re.compile(
-            rf"^(\s*{re.escape(stat.config_key)}\s*=\s*)[0-9eE.+-]+(.*)$"
+            rf"^(\s*{re.escape(stat.config_key)}\s*=\s*)[^\s#]+(.*)$"
         )
         out: list[str] = []
         replaced = False

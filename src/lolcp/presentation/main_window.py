@@ -1,4 +1,4 @@
-"""主視窗：表格 + 右側詳情面板。"""
+"""主視窗：表格 + 右側「詳情／權重」分頁。"""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from lolcp.application.use_cases.adjust_champion_weight import AdjustChampionWeight
 from lolcp.application.use_cases.list_valuations import ListValuations
 from lolcp.application.use_cases.sync_game_data import SyncResult
 from lolcp.domain.diagnostics import Diagnostics
@@ -34,7 +35,7 @@ class MainWindow(QMainWindow):
         list_valuations: ListValuations,
         champions: tuple[Champion, ...],
         diagnostics: Diagnostics,
-        adjust_weights=None,
+        adjust_weights: AdjustChampionWeight | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -110,7 +111,7 @@ class MainWindow(QMainWindow):
         self,
         list_valuations: ListValuations,
         champions: tuple[Champion, ...],
-        adjust_weights=None,
+        adjust_weights: AdjustChampionWeight | None = None,
     ) -> None:
         """換版本後注入新的 use case 與英雄清單。視角重設為全域。"""
         self._list_valuations = list_valuations
@@ -159,8 +160,12 @@ class MainWindow(QMainWindow):
         champion = self._profile.current_champion()
         if champion is None or self._adjust_weights is None:
             return
-        self._adjust_weights.execute(champion, stat, value)
-        self.reload()
+        before = self._list_valuations.weight_resolver.overrides
+        after = self._adjust_weights.execute(champion, stat, value)
+        if after != before:
+            self.reload()
+        else:
+            self._refresh_weight_panel()  # 拉桿格位歸位，不觸發重算
 
     @property
     def refresh_button(self) -> QPushButton:

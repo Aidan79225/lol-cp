@@ -24,7 +24,7 @@ from lolcp.presentation.main_window import MainWindow
 class AppCoordinator(QObject):
     def __init__(
         self,
-        build: Callable[[str], tuple],  # version -> (list_valuations, champions)
+        build: Callable[[str], tuple],  # version -> (list_valuations, champions, adjust_weights)
         diagnostics: Diagnostics,
         thread,   # QThread；只用到 start/quit
         app,      # QApplication；只用到 quit
