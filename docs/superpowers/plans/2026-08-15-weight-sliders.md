@@ -378,7 +378,7 @@ class TomlOverridesStore:
         path.write_text("".join(out), encoding="utf-8")
 ```
 
-- [ ] **Step 4: 確認通過** — 7 passed；`uv run pytest -q` 全綠
+- [ ] **Step 4: 確認通過** — 6 passed；`uv run pytest -q` 全綠
 - [ ] **Step 5: 提交** — `feat: TomlOverridesStore 行級編輯覆寫檔`
 
 ---
