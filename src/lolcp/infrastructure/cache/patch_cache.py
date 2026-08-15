@@ -67,7 +67,12 @@ class PatchCache:
         return staging
 
     def commit(self, version: str, staging: Path) -> Path:
-        """寫入完整性標記後以單次 rename 原子提交。"""
+        """寫入完整性標記後以單次 rename 原子提交。
+
+        原子性只涵蓋 process crash；未 fsync，斷電時檔案系統仍可能
+        留下有標記但內容截斷的目錄。可重新下載的快取不值得為此付出
+        逐檔 fsync 的成本。
+        """
         (staging / self.COMPLETE_MARKER).write_text("", encoding="utf-8")
         target = self.dir_for(version)
         if target.exists():
