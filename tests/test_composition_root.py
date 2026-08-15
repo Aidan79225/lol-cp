@@ -9,6 +9,7 @@ from lolcp.main import build_application, build_use_cases
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
 CONFIG = pathlib.Path(__file__).parent.parent / "config"
+SRC = pathlib.Path(__file__).parent.parent / "src" / "lolcp"  # 錨定絕對路徑，cwd 無關
 
 
 def test_build_application_does_not_touch_the_network(tmp_path):
@@ -37,10 +38,12 @@ def test_build_use_cases_produces_a_working_pipeline(tmp_path):
 
 def test_only_main_imports_presentation():
     """組裝根之外，任何模組都不得 import presentation。"""
+    scanned = 0
     offenders = []
-    for path in pathlib.Path("src/lolcp").rglob("*.py"):
+    for path in SRC.rglob("*.py"):
         if path.name == "main.py" or "presentation" in path.parts:
             continue
+        scanned += 1
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             mod = node.module if isinstance(node, ast.ImportFrom) else None
@@ -48,12 +51,15 @@ def test_only_main_imports_presentation():
             for target in filter(None, [mod, *names]):
                 if "presentation" in target:
                     offenders.append(f"{path}: {target}")
+    assert scanned > 0, "掃描不到任何檔案 —— 路徑錨定失效，測試在空轉"
     assert offenders == []
 
 
 def test_domain_never_imports_qt():
+    paths = list((SRC / "domain").rglob("*.py"))
+    assert paths, "掃描不到任何檔案 —— 路徑錨定失效，測試在空轉"
     offenders = []
-    for path in pathlib.Path("src/lolcp/domain").rglob("*.py"):
+    for path in paths:
         source = path.read_text(encoding="utf-8")
         if "PySide6" in source:
             offenders.append(str(path))

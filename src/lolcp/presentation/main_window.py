@@ -97,6 +97,13 @@ class MainWindow(QMainWindow):
         self._progress.setMaximum(total or 0)
         self._progress.setValue(done)
 
+    def set_use_cases(
+        self, list_valuations: ListValuations, champions: tuple[Champion, ...]
+    ) -> None:
+        """換版本後注入新的 use case 與英雄清單。視角重設為全域。"""
+        self._list_valuations = list_valuations
+        self._profile.set_champions(champions)
+
     def reload(self) -> None:
         champion = self._profile.current_champion()
         self._all_comparisons = self._list_valuations.execute(champion)

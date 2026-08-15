@@ -80,9 +80,9 @@ def build_use_cases(context: AppContext, version: str):
 
 def main() -> int:
     from PySide6.QtCore import QThread
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication
 
-    from lolcp.presentation.main_window import MainWindow
+    from lolcp.presentation.app_coordinator import AppCoordinator
     from lolcp.presentation.sync_worker import SyncWorker
 
     app = QApplication(sys.argv)
@@ -93,24 +93,17 @@ def main() -> int:
     worker.moveToThread(thread)
     thread.started.connect(worker.run)
 
-    window: MainWindow | None = None
-
-    def on_finished(result) -> None:
-        nonlocal window
-        list_valuations, champions = build_use_cases(context, result.version)
-        window = MainWindow(list_valuations, champions, context.diagnostics)
-        window.on_sync_finished(result)
-        window.refresh_button.clicked.connect(lambda: thread.start())
-        window.show()
-        thread.quit()
-
-    def on_failed(message: str) -> None:
-        QMessageBox.critical(None, "無法載入資料", message)
-        thread.quit()
-        app.quit()
-
-    worker.finished.connect(on_finished)
-    worker.failed.connect(on_failed)
+    # slot 必須是主執行緒 QObject 的 bound method，Qt 才會把呼叫
+    # queue 回主執行緒 —— plain closure 會在 worker thread 建視窗。
+    coordinator = AppCoordinator(
+        build=lambda version: build_use_cases(context, version),
+        diagnostics=context.diagnostics,
+        thread=thread,
+        app=app,
+    )
+    worker.progress.connect(coordinator.on_progress)
+    worker.finished.connect(coordinator.on_finished)
+    worker.failed.connect(coordinator.on_failed)
     thread.start()
     return app.exec()
 
