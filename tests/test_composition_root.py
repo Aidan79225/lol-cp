@@ -1,0 +1,60 @@
+"""組裝根與分層驗證。"""
+
+import ast
+import pathlib
+
+import pytest
+
+from lolcp.main import build_application, build_use_cases
+
+FIXTURES = pathlib.Path(__file__).parent / "fixtures"
+CONFIG = pathlib.Path(__file__).parent.parent / "config"
+
+
+def test_build_application_does_not_touch_the_network(tmp_path):
+    context = build_application(cache_root=tmp_path, config_dir=CONFIG)
+    assert context.cache.latest_complete() is None
+    assert context.diagnostics.summary_line() == "無異常"
+
+
+def test_build_use_cases_produces_a_working_pipeline(tmp_path):
+    """用 fixture 當快取目錄，端到端算出 CP值。"""
+    cache_root = tmp_path
+    (cache_root / "16.15.1").mkdir(parents=True)
+    for f in (FIXTURES / "16.15.1").iterdir():
+        (cache_root / "16.15.1" / f.name).write_bytes(f.read_bytes())
+    (cache_root / "16.15.1" / ".complete").write_text("", encoding="utf-8")
+
+    context = build_application(cache_root=cache_root, config_dir=CONFIG)
+    list_valuations, champions = build_use_cases(context, "16.15.1")
+
+    comparisons = list_valuations.execute(None)
+    assert comparisons
+    ie = next(c for c in comparisons if c.item.item_id == 3031)
+    assert ie.canonical.ratio * 100 == pytest.approx(103.6, abs=0.05)
+    assert any(c.key == "Draven" for c in champions)
+
+
+def test_only_main_imports_presentation():
+    """組裝根之外，任何模組都不得 import presentation。"""
+    offenders = []
+    for path in pathlib.Path("src/lolcp").rglob("*.py"):
+        if path.name == "main.py" or "presentation" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            mod = node.module if isinstance(node, ast.ImportFrom) else None
+            names = [a.name for a in node.names] if isinstance(node, ast.Import) else []
+            for target in filter(None, [mod, *names]):
+                if "presentation" in target:
+                    offenders.append(f"{path}: {target}")
+    assert offenders == []
+
+
+def test_domain_never_imports_qt():
+    offenders = []
+    for path in pathlib.Path("src/lolcp/domain").rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        if "PySide6" in source:
+            offenders.append(str(path))
+    assert offenders == []
