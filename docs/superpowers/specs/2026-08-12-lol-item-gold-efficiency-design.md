@@ -108,7 +108,7 @@ https://raw.communitydragon.org/latest/game/items.cdtb.bin.json      # 15.8 MB
 遊戲真正的數值檔，key 形如 `Items/3031`。**29 種屬性欄位**（Data Dragon 的兩倍以上；其中 5 個使用非 `mXxxMod`
 命名慣例 —— `PhysicalLethality` 裸名、`flatMPPoolMod` 等小寫開頭 ——
 曾因偵測器盲點被靜默丟棄，2026-08-15 修復，見
-`2026-08-15-bin-field-blind-spot-design.md`），涵蓋標準 ID 的 SR 可購買裝備 **93%（198/212）**。
+`2026-08-15-bin-field-blind-spot-design.md`），涵蓋標準 ID 的 SR 可購買裝備 **94%（199/212，盲點修復後）**。
 
 實例（`Items/3031`）：
 ```
@@ -699,7 +699,7 @@ AD 1.0   AP 1.0   暴擊 1.0   攻速 1.0   生命 0.6   護甲 0.5
 
 ### 10.4 契約測試
 
-標記 `@pytest.mark.network`，實際請求 CDN 驗證 schema 未變（欄位仍在、URL 仍活、bin 仍無法力欄位）。預設跳過，需確認改版影響時手動執行。
+標記 `@pytest.mark.network`，實際請求 CDN 驗證 schema 未變（欄位仍在、URL 仍活、三種命名慣例的代表欄位仍在）。預設跳過，需確認改版影響時手動執行。
 
 **這是唯一能提早發現 Riot 改格式的機制**，而 bin 檔 schema 是整個專案最脆弱的一層。
 
@@ -716,7 +716,7 @@ AD 1.0   AP 1.0   暴擊 1.0   攻速 1.0   生命 0.6   護甲 0.5
 | 1 | CP值 = 從基礎裝備反推單價 | 改版後單價自動跟上，不需手動維護常數表 |
 | 2 | 兩種定價法並列顯示 | 差異大者 = 被動價值高或屬性被低估，本身即分析入口 |
 | 3 | 屬性來源 = CommunityDragon bin | Data Dragon 缺 41% 裝備的屬性；Meraki 已死；CDragon client 無屬性 |
-| 4 | 法力來自 Data Dragon | bin 完全不存法力欄位 |
+| 4 | 法力 bin 優先、DD 補缺 | 兩來源各 15 件、零分歧（2026-08-15 更正） |
 | 5 | 英雄層 = Level 1，float 權重 | 與 Level 2 同型，日後加 UI 不動 domain |
 | 6 | 權重三層解析 | 新增英雄零成本；覆寫僅寫差異 |
 | 7 | 介面 = 表格 + 詳情面板 | 屬性拆解是「為何 CP值 低」的唯一答案所在 |

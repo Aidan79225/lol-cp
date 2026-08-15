@@ -99,9 +99,10 @@ class ItemMapper:
         return stats
 
     def _merge_mana(self, stats: dict[StatKey, float], raw_dd: dict) -> None:
-        """法力以 bin（flatMPPoolMod，15 件）優先，DD（23 件）只補缺。
+        """法力以 bin（flatMPPoolMod）優先，DD 只補缺。
 
-        兩來源重疊值實測零分歧；若日後分歧，一致性檢查會記錄。
+        16.15.1 實測兩來源各 15 件、完全重疊、零分歧 —— DD 補缺
+        目前是防禦性分支；若日後分歧，一致性檢查會記錄。
         """
         raw_mana = (raw_dd.get("stats") or {}).get(DDRAGON_MANA_FIELD)
         if raw_mana:

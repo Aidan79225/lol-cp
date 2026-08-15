@@ -103,8 +103,8 @@ BIN_FIELD_TO_STAT: dict[str, StatKey] = {
     "flatMPPoolMod": StatKey.MANA,
 }
 
-# Data Dragon 的法力欄位（bin 的小寫 flatMPPoolMod 只涵蓋 15 件，DD 23 件，
-# 兩者重疊值零分歧；bin 優先、DD 補缺）。
+# Data Dragon 的法力欄位。16.15.1 實測 bin（小寫 flatMPPoolMod）與 DD
+# 各 15 件、完全重疊、零分歧；bin 優先、DD 補缺為防禦性分支。
 DDRAGON_MANA_FIELD = "FlatMPPoolMod"
 
 # 原始值為分數、需 ×100 轉為「以 1% 為單位」。

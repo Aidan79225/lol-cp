@@ -8,6 +8,6 @@
 # Marksman 預設的 0.8 偏高。
 armor_pen_percent = 0.4
 
-# armor_pen_flat 在召喚峽谷可購買裝備中未出現（見 spec §5.3），
-# 因此這行對 SR 分析無實際影響，僅記錄判斷以免日後 Riot 新增此類裝備時漏改。
+# armor_pen_flat（穿甲）在 2026-08-15 盲點修復後現身（12 件 SR 裝備），
+# 這行覆寫從「僅記錄」變為實際生效。
 armor_pen_flat = 0.4

@@ -54,10 +54,27 @@ def test_infinity_edge_gets_all_three_stats_including_crit_damage(mapper, dd_dat
     assert item.amount_of(StatKey.CRIT_DAMAGE) == 30.0
 
 
-def test_mana_comes_from_ddragon_because_bin_lacks_it(mapper, dd_data, bin_data):
-    """藍水晶在 bin 裡沒有任何屬性欄位。"""
+def test_blue_crystal_mana_comes_from_bin_first(mapper, dd_data, bin_data):
+    """藍水晶 bin 有 flatMPPoolMod=300（「bin 不存法力」是舊誤判），
+    bin 優先；DD 值相同，一致性檢查零分歧。"""
     item = mapper.to_item(1027, dd_data["1027"], bin_data["Items/1027"])
     assert item.amount_of(StatKey.MANA) == 300.0
+
+
+def test_ddragon_fills_mana_when_bin_lacks_it(mapper, dd_data):
+    """合成情境：bin 條目無法力欄位時，DD 補缺（setdefault 分支）。"""
+    raw_dd = dict(dd_data["1027"])
+    item = mapper.to_item(1027, raw_dd, {"itemID": 1027})
+    assert item.amount_of(StatKey.MANA) == 300.0
+
+
+def test_bin_mana_wins_on_divergence_and_conflict_is_recorded(mapper, diagnostics, dd_data):
+    """合成情境：bin 與 DD 法力分歧時 bin 勝出，且分歧記入診斷 ——
+    一致性檢查不再跳過法力。"""
+    raw_bin = {"itemID": 1027, "flatMPPoolMod": 280.0}
+    item = mapper.to_item(1027, dd_data["1027"], raw_bin)
+    assert item.amount_of(StatKey.MANA) == 280.0
+    assert any(c.stat is StatKey.MANA for c in diagnostics.conflicts)
 
 
 def test_cloak_of_agility_crit_is_exactly_fifteen_after_rounding(mapper, dd_data, bin_data):

@@ -60,7 +60,7 @@ def test_reset_all_emits_for_every_override():
 
 
 def test_panel_lists_only_sr_stats():
-    """25 個 StatKey 中只有 21 個出現在召喚峽谷裝備 —— 其餘 4 個
+    """28 個 StatKey 中只有 25 個出現在召喚峽谷裝備 —— 其餘 3 個
     是死拉桿（調了也不影響任何價格），不該出現。"""
     from lolcp.domain.stats import SR_STATS
 

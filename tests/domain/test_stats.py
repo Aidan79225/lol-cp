@@ -70,7 +70,7 @@ def test_bin_field_map_covers_all_twentynine_bin_fields():
 
 def test_mana_comes_from_both_sources():
     """「bin 完全不存法力」是舊的錯誤結論 —— bin 以小寫 flatMPPoolMod
-    存法力（15 件），DD 23 件補缺，重疊值實測零分歧。"""
+    存法力；16.15.1 實測與 DD 各 15 件、完全重疊、零分歧。"""
     assert BIN_FIELD_TO_STAT["flatMPPoolMod"] is StatKey.MANA
 
 
