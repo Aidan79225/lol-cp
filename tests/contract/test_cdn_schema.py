@@ -82,8 +82,8 @@ def test_cdragon_accepts_major_minor_but_not_the_full_version(gateway, latest):
     assert excinfo.value.code == 404  # 403 之類代表別的事變了，不可混為一談
 
 
-def test_bin_still_carries_ability_haste_and_lacks_mana(gateway, latest):
-    """兩個關鍵事實：bin 有 Data Dragon 缺的技能加速，且完全不存法力。
+def test_bin_still_carries_ability_haste_and_lowercase_mana(gateway, latest):
+    """關鍵事實：bin 有 DD 缺的技能加速與穿甲，法力以小寫 flatMPPoolMod 存在。
 
     欄位偵測沿用 mapping.looks_like_bin_stat_field 的廣義形態判斷，
     而非寫死 mFlat/mPercent/mAbility 前綴 —— 寫死前綴會讓
@@ -104,7 +104,8 @@ def test_bin_still_carries_ability_haste_and_lacks_mana(gateway, latest):
     }
     assert "mAbilityHasteMod" in stat_fields
     assert "mFlatCritDamageMod" in stat_fields
-    assert not any("MPPool" in field for field in stat_fields)
+    assert "PhysicalLethality" in stat_fields   # 裸名慣例（穿甲）
+    assert "flatMPPoolMod" in stat_fields       # 小寫慣例（法力）——「bin 不存法力」是舊誤判
     unknown = stat_fields - set(BIN_FIELD_TO_STAT)
     assert not unknown, f"bin 出現未知屬性欄位，需更新 BIN_FIELD_TO_STAT：{unknown}"
 
