@@ -39,6 +39,26 @@ class Item:
 
 
 @dataclass(frozen=True)
+class ChampionBaseStats:
+    """英雄基礎數值與每級成長（champion.json 的 stats 區塊，純資料驅動）。
+
+    攻速成長與裝備攻速都是對基礎攻速的百分比加成，其餘為線性疊加；
+    等級縮放一律走 combat.growth_factor 的非線性公式。
+    """
+
+    attack_damage: float
+    attack_damage_growth: float
+    attack_speed: float          # 次/秒
+    attack_speed_growth: float   # %/級
+    hp: float
+    hp_growth: float
+    armor: float
+    armor_growth: float
+    magic_resist: float
+    magic_resist_growth: float
+
+
+@dataclass(frozen=True)
 class Champion:
     """一隻英雄。partype 與 tags 一律取自 en_US（在地化字串不可用於邏輯判斷）。"""
 
@@ -47,6 +67,7 @@ class Champion:
     name: str          # 顯示用，取自 zh_TW
     tags: tuple[str, ...]
     partype: str       # en_US，例如 "Mana" / "Flow" / "None"
+    base_stats: ChampionBaseStats | None = None  # 無資料時邊際欄退化為「—」
 
     @property
     def uses_mana(self) -> bool:
