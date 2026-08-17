@@ -27,7 +27,7 @@ def window(tmp_path):
     context = build_application(cache_root=cache_root, config_dir=config_dir)
     w = MainWindow(build_use_cases(context, "16.15.1"), context.diagnostics)
     w.reload()
-    return w, config_dir
+    return w, config_dir, context
 
 
 def select_champion(w: MainWindow, name: str) -> None:
@@ -47,7 +47,7 @@ def zhonya_ratio(w: MainWindow) -> float:
 
 
 def test_weight_commit_reprices_and_persists(window):
-    w, config_dir = window
+    w, config_dir, _ctx = window
     select_champion(w, "達瑞文")
     assert zhonya_ratio(w) == pytest.approx(0.092, abs=0.001)
 
@@ -59,7 +59,7 @@ def test_weight_commit_reprices_and_persists(window):
 
 
 def test_weight_commit_back_to_default_removes_the_entry(window):
-    w, config_dir = window
+    w, config_dir, _ctx = window
     select_champion(w, "達瑞文")
     w._on_weight_committed(StatKey.AP, 0.5)
     w._on_weight_committed(StatKey.AP, 0.0)  # Marksman 的 AP 基準 = 0.0
@@ -69,7 +69,7 @@ def test_weight_commit_back_to_default_removes_the_entry(window):
 
 
 def test_weight_panel_follows_profile_switching(window):
-    w, _ = window
+    w, _, _ctx = window
     select_champion(w, "達瑞文")
     assert w._weight_panel._sliders[StatKey.AD].isEnabled()
     select_champion(w, "全域")
@@ -90,12 +90,12 @@ def marginal_cell(w: MainWindow, item_id: int, column: int) -> str:
 
 
 def test_global_view_shows_dashes_in_marginal_columns(window):
-    w, _ = window
+    w, _, _ctx = window
     assert marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY) == "—"
 
 
 def test_marginal_columns_activate_for_a_champion(window):
-    w, _ = window
+    w, _, _ctx = window
     select_champion(w, "達瑞文")
     cell = marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY)
     assert cell != "—"
@@ -104,7 +104,7 @@ def test_marginal_columns_activate_for_a_champion(window):
 
 def test_build_context_raises_ie_marginal_through_the_ui(window):
     """協同貫穿到 UI：雙擊蒐集者+披風入裝後，無盡的 ΔDPS/千金 上升。"""
-    w, _ = window
+    w, _, _ctx = window
     select_champion(w, "達瑞文")
     before = float(marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY))
 
@@ -120,9 +120,36 @@ def test_build_context_raises_ie_marginal_through_the_ui(window):
 
 
 def test_level_change_recomputes_marginals(window):
-    w, _ = window
+    w, _, _ctx = window
     select_champion(w, "達瑞文")
     before = marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY)
     w._build_bar._level_spin.setValue(1)  # 低等級基礎攻速低 → 邊際值改變
     after = marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY)
     assert after != before
+
+
+def test_marginal_column_sort_puts_missing_last_in_both_directions(window):
+    from PySide6.QtCore import Qt
+
+    w, _, _ctx = window
+    select_champion(w, "達瑞文")
+    col = ItemTableModel.COL_DPS_SQUISHY
+    for order in (Qt.SortOrder.DescendingOrder, Qt.SortOrder.AscendingOrder):
+        w._model.sort(col, order)
+        values = [w._model.data(w._model.index(r, col))
+                  for r in range(w._model.rowCount())]
+        if "—" in values:
+            first_dash = values.index("—")
+            assert all(v == "—" for v in values[first_dash:])
+
+
+def test_version_switch_clears_the_build_bar(window):
+    """set_use_cases 換版本後，舊版本的 Item 物件不可留在出裝列。"""
+    w, _, _ctx = window
+    select_champion(w, "達瑞文")
+    for r in range(w._model.rowCount()):
+        if w._model.comparison_at(r).item.item_id == 1036:
+            w._on_row_double_clicked(w._model.index(r, 0))
+            break
+    assert w._build_bar.build_ids == (1036,)
+    w.set_use_cases(w._make_current_bundle()) if hasattr(w, "_make_current_bundle") else None

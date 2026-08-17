@@ -19,7 +19,7 @@ def test_add_and_remove_items():
     bar.add_item(item(1, "劍"))
     bar.add_item(item(2, "斧"))
     assert bar.build_ids == (1, 2)
-    bar._remove(bar._buttons[0])
+    bar._buttons[0].click()  # 走真實點擊路徑（lambda 捕捉最脆弱）
     assert bar.build_ids == (2,)
     assert len(fired) == 3
 

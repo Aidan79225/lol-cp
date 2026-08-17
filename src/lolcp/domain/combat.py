@@ -122,9 +122,12 @@ class CombatModel:
         return aa_dps + self._spell_dps(profile, target)
 
     def _spell_dps(self, profile: CombatProfile, target: TargetProfile) -> float:
-        """只在 AP > 0 時計入 —— 否則基準傷會讓每隻英雄憑空多一段傷害。"""
-        if profile.ap <= 0:
-            return 0.0
+        """基準傷代表「每隻英雄都有的泛用技能循環」，恆計入。
+
+        常數在邊際比較中自然抵銷 —— AP 件只得到自己的倍率份額
+        （曾有過 AP>0 閘門，讓 435g 增幅典籍繼承整段基準傷而霸榜）；
+        魔穿與技能加速則合理作用於基準傷（AD 英雄的技能也有基礎傷）。
+        """
         effective_mr = max(
             0.0,
             target.magic_resist * (1 - profile.magic_pen_percent / 100)

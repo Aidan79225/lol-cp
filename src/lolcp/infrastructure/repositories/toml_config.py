@@ -80,17 +80,20 @@ def load_champion_overrides(directory: Path) -> ChampionOverrides:
 def load_combat_config(path: Path) -> tuple[SpellProxy, tuple[TargetProfile, ...]]:
     """讀取邊際效益模型常數。缺區塊、缺欄位都要大聲失敗。"""
     raw = _read_toml(path)
+    for section in raw:
+        if section not in ("spell_proxy", "targets"):
+            raise ConfigError(f"{path.name} 出現未知區塊 {section!r}")
     proxy_raw = raw.get("spell_proxy")
     if not isinstance(proxy_raw, dict):
         raise ConfigError(f"{path.name} 缺少 [spell_proxy] 區塊")
-    try:
-        proxy = SpellProxy(
-            base_damage=float(proxy_raw["base_damage"]),
-            ap_ratio=float(proxy_raw["ap_ratio"]),
-            base_cooldown=float(proxy_raw["base_cooldown"]),
-        )
-    except KeyError as exc:
-        raise ConfigError(f"spell_proxy 缺少欄位 {exc.args[0]}") from exc
+    proxy = SpellProxy(
+        base_damage=_required_number(proxy_raw, "base_damage", "spell_proxy"),
+        ap_ratio=_required_number(proxy_raw, "ap_ratio", "spell_proxy"),
+        base_cooldown=_required_number(proxy_raw, "base_cooldown", "spell_proxy"),
+    )
+    unknown = set(proxy_raw) - {"base_damage", "ap_ratio", "base_cooldown"}
+    if unknown:
+        raise ConfigError(f"spell_proxy 出現未知欄位 {sorted(unknown)}")
 
     targets_raw = raw.get("targets")
     if not isinstance(targets_raw, dict) or not targets_raw:
@@ -99,16 +102,27 @@ def load_combat_config(path: Path) -> tuple[SpellProxy, tuple[TargetProfile, ...
     for key, body in targets_raw.items():
         if not isinstance(body, dict):
             raise ConfigError(f"targets.{key} 的內容必須是表格")
-        for field in ("name", "armor", "magic_resist", "hp"):
-            if field not in body:
-                raise ConfigError(f"targets.{key} 缺少欄位 {field}")
+        unknown = set(body) - {"name", "armor", "magic_resist", "hp"}
+        if unknown:
+            raise ConfigError(f"targets.{key} 出現未知欄位 {sorted(unknown)}")
+        if "name" not in body:
+            raise ConfigError(f"targets.{key} 缺少欄位 name")
         targets.append(
             TargetProfile(
                 key=key,
                 name=str(body["name"]),
-                armor=float(body["armor"]),
-                magic_resist=float(body["magic_resist"]),
-                hp=float(body["hp"]),
+                armor=_required_number(body, "armor", f"targets.{key}"),
+                magic_resist=_required_number(body, "magic_resist", f"targets.{key}"),
+                hp=_required_number(body, "hp", f"targets.{key}"),
             )
         )
     return proxy, tuple(targets)
+
+
+def _required_number(body: dict, field: str, where: str) -> float:
+    if field not in body:
+        raise ConfigError(f"{where} 缺少欄位 {field}")
+    value = body[field]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ConfigError(f"{where}.{field} 必須是數值，得到 {value!r}")
+    return float(value)

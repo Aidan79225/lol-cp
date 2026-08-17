@@ -121,9 +121,13 @@ class ItemTableModel(QAbstractTableModel):
         return None
 
     def sort(self, column: int, order=Qt.SortOrder.AscendingOrder) -> None:
+        missing = (
+            float("inf") if order == Qt.SortOrder.AscendingOrder else float("-inf")
+        )  # 無資料恆排最後，與排序方向無關
+
         def marginal_key(c, col):
             value = self._marginal_value(c.item.item_id, col)
-            return value if value is not None else float("-inf")  # 無資料排最後
+            return value if value is not None else missing
 
         keys = {
             self.COL_NAME: lambda c: c.item.name,

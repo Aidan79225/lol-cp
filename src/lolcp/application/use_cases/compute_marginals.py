@@ -8,7 +8,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from lolcp.application.ports import ItemRepository
-from lolcp.domain.combat import CombatModel, MarginalResult, TargetProfile
+from lolcp.domain.combat import (
+    CombatModel,
+    MarginalResult,
+    MarginalValuation,
+    TargetProfile,
+)
 from lolcp.domain.entities import Champion
 
 
@@ -36,8 +41,6 @@ class ComputeMarginals:
         """
         if champion is None or champion.base_stats is None:
             return ()
-        from lolcp.domain.combat import MarginalValuation
-
         all_items = self.items.all_items()
         by_id = {i.item_id: i for i in all_items}
         build = [by_id[i] for i in build_ids if i in by_id]

@@ -112,6 +112,7 @@ class MainWindow(QMainWindow):
         self._list_valuations = bundle.list_valuations
         self._adjust_weights = bundle.adjust_weights
         self._compute_marginals = bundle.compute_marginals
+        self._build_bar.clear()  # 舊版本的 Item 物件不可跨版本沿用
         self._profile.set_champions(bundle.champions)
 
     def reload(self) -> None:
@@ -148,9 +149,6 @@ class MainWindow(QMainWindow):
 
     def _refresh_marginals(self) -> None:
         champion = self._profile.current_champion()
-        if self._compute_marginals is None:
-            self._model.set_marginals(None)
-            return
         results = self._compute_marginals.execute(
             champion, self._build_bar.level, self._build_bar.build_ids
         )

@@ -34,6 +34,16 @@ def model() -> CombatModel:
     return CombatModel(PROXY)
 
 
+def spell_const(target: TargetProfile) -> float:
+    """無 AP／魔穿／加速時的常數基準技能 DPS。"""
+    return 300.0 * (100 / (100 + target.magic_resist)) / 8
+
+
+def aa_dps(profile, target) -> float:
+    """隔離普攻通道：總 DPS 扣掉常數基準技能（比值斷言用）。"""
+    return model().total_dps(profile, target) - spell_const(target)
+
+
 def test_growth_factor_is_riot_nonlinear_formula():
     """stat(lv) = base + growth × (lv−1) × (0.7025 + 0.0175×(lv−1))，非線性。"""
     assert growth_factor(1) == 0.0
@@ -48,12 +58,12 @@ def test_draven_level_11_base_profile():
     assert profile.hp == pytest.approx(675 + 104 * 8.775)
 
 
-def test_naked_draven_dps_vs_squishy_is_pure_auto_attack():
-    """裸裝無 AP：總 DPS 只剩普攻 —— 62 × 0.8399 × 1 × 100/160 ≈ 32.55。
-    法術 proxy 的基準傷不該在 AP=0 時貢獻（否則每隻英雄憑空多一段傷害）。"""
+def test_naked_draven_dps_is_auto_attack_plus_base_spell():
+    """普攻 32.55 + 基準技能 300×(100/150)/8 = 25 —— 基準傷恆計入
+    （代表每隻英雄都有的泛用技能循環），常數在邊際比較中抵銷。"""
     profile = model().profile(DRAVEN_BASE, 11, [])
     dps = model().total_dps(profile, SQUISHY)
-    assert dps == pytest.approx(62 * 0.679 * 1.236925 * 0.625, rel=1e-6)
+    assert dps == pytest.approx(62 * 0.679 * 1.236925 * 0.625 + 25.0, rel=1e-6)
 
 
 def test_crit_factor_multiplies_chance_and_damage():
@@ -62,7 +72,7 @@ def test_crit_factor_multiplies_chance_and_damage():
                     StatLine(StatKey.CRIT_DAMAGE, 30.0))]
     profile = model().profile(DRAVEN_BASE, 11, weapons)
     base_profile = model().profile(DRAVEN_BASE, 11, [])
-    ratio = model().total_dps(profile, SQUISHY) / model().total_dps(base_profile, SQUISHY)
+    ratio = aa_dps(profile, SQUISHY) / aa_dps(base_profile, SQUISHY)
     assert ratio == pytest.approx(1.2625)
 
 
@@ -70,7 +80,7 @@ def test_crit_chance_is_capped_at_100():
     weapons = [item(1, 1000, StatLine(StatKey.CRIT_CHANCE, 160.0))]
     profile = model().profile(DRAVEN_BASE, 11, weapons)
     base_profile = model().profile(DRAVEN_BASE, 11, [])
-    ratio = model().total_dps(profile, SQUISHY) / model().total_dps(base_profile, SQUISHY)
+    ratio = aa_dps(profile, SQUISHY) / aa_dps(base_profile, SQUISHY)
     assert ratio == pytest.approx(1.75)  # 100% 暴擊 × 基礎暴傷 175%
 
 
@@ -80,16 +90,15 @@ def test_penetration_order_percent_before_flat():
                     StatLine(StatKey.ARMOR_PEN_FLAT, 10.0))]
     profile = model().profile(DRAVEN_BASE, 11, weapons)
     base_profile = model().profile(DRAVEN_BASE, 11, [])
-    ratio = model().total_dps(profile, TANK) / model().total_dps(base_profile, TANK)
+    ratio = aa_dps(profile, TANK) / aa_dps(base_profile, TANK)
     assert ratio == pytest.approx(300 / 230)  # 100/(100+130) ÷ 100/(100+200)
 
 
 def test_effective_armor_never_goes_negative():
     weapons = [item(1, 1000, StatLine(StatKey.ARMOR_PEN_FLAT, 999.0))]
     profile = model().profile(DRAVEN_BASE, 11, weapons)
-    dps_squishy = model().total_dps(profile, SQUISHY)
     naked_ad = 62 * 0.679 * 1.236925
-    assert dps_squishy == pytest.approx(naked_ad)  # 倍率封頂 1.0，不放大
+    assert aa_dps(profile, SQUISHY) == pytest.approx(naked_ad)  # 倍率封頂 1.0，不放大
 
 
 def test_attack_speed_items_scale_the_base_ratio_and_cap_at_2_5():
@@ -101,25 +110,26 @@ def test_attack_speed_items_scale_the_base_ratio_and_cap_at_2_5():
     assert model().profile(DRAVEN_BASE, 11, silly).attack_speed == 2.5
 
 
-def test_spell_proxy_contributes_when_ap_is_present():
-    """AP 100、加速 0、對魔抗 50：(300 + 70) × 100/150 ÷ 8 ≈ 30.83。"""
+def test_ap_item_delta_is_only_its_scaling_share():
+    """AP 100 的增量 = 0.7×100 × 100/150 ÷ 8 ≈ 5.83 —— 基準傷已在
+    基線裡，AP 件不繼承它。"""
     weapons = [item(1, 1000, StatLine(StatKey.AP, 100.0))]
     profile = model().profile(DRAVEN_BASE, 11, weapons)
     base_profile = model().profile(DRAVEN_BASE, 11, [])
     delta = model().total_dps(profile, SQUISHY) - model().total_dps(base_profile, SQUISHY)
-    assert delta == pytest.approx((300 + 70) * (100 / 150) / 8)
+    assert delta == pytest.approx(70 * (100 / 150) / 8)
 
 
-def test_ability_haste_speeds_up_the_proxy():
-    """加速 100 = 冷卻減半 = proxy DPS 加倍。"""
+def test_ability_haste_100_doubles_the_whole_spell_channel():
+    """加速 100 = 冷卻減半 = 整段法術 DPS（含基準傷）加倍。"""
     ap_only = [item(1, 1000, StatLine(StatKey.AP, 100.0))]
     hasted = [item(1, 1000, StatLine(StatKey.AP, 100.0),
                    StatLine(StatKey.ABILITY_HASTE, 100.0))]
     m = model()
-    base = m.profile(DRAVEN_BASE, 11, [])
-    spell = m.total_dps(m.profile(DRAVEN_BASE, 11, ap_only), SQUISHY) - m.total_dps(base, SQUISHY)
-    spell_hasted = m.total_dps(m.profile(DRAVEN_BASE, 11, hasted), SQUISHY) - m.total_dps(base, SQUISHY)
-    assert spell_hasted == pytest.approx(2 * spell)
+    spell_full = (300 + 70) * (100 / 150) / 8   # 未加速的整段法術 DPS
+    dps_ap = m.total_dps(m.profile(DRAVEN_BASE, 11, ap_only), SQUISHY)
+    dps_hasted = m.total_dps(m.profile(DRAVEN_BASE, 11, hasted), SQUISHY)
+    assert dps_hasted - dps_ap == pytest.approx(spell_full)  # 加倍 = 再加一整段
 
 
 def test_mixed_ehp_is_the_average_of_both_defenses():
@@ -195,3 +205,20 @@ def test_ruby_crystal_adds_ehp_but_no_dps():
 def test_zero_gold_items_are_skipped():
     free = item(9, 0, StatLine(StatKey.AD, 10.0))
     assert marginal([], [free]) == ()
+
+
+
+def test_cheap_ap_component_does_not_dominate_the_ranking():
+    """回歸鎖：曾有 AP>0 閘門讓 435g 增幅典籍繼承整段基準傷（~60/千金）
+    而霸榜。修正後它的 ΔDPS/千金 應低於長劍。"""
+    tome = item(1052, 435, StatLine(StatKey.AP, 20.0))
+    sword = item(1036, 350, StatLine(StatKey.AD, 10.0))
+    tome_r, sword_r = marginal([], [tome, sword])
+    assert tome_r.dps_per_1k["squishy"] < sword_r.dps_per_1k["squishy"]
+
+
+def test_magic_pen_and_haste_act_on_the_base_spell():
+    """魔穿與加速對 AD 英雄也有合理價值 —— 他們的技能也有基礎傷。"""
+    haste = item(7, 1000, StatLine(StatKey.ABILITY_HASTE, 20.0))
+    (result,) = marginal([], [haste])
+    assert result.dps_per_1k["squishy"] > 0
