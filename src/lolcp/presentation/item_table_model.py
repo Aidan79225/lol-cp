@@ -15,19 +15,30 @@ from lolcp.domain.valuation import ItemComparison
 
 
 class ItemTableModel(QAbstractTableModel):
-    COLUMNS: tuple[str, ...] = ("裝備", "售價", "權威", "平方", "差異")
+    COLUMNS: tuple[str, ...] = (
+        "裝備", "售價", "權威", "平方", "差異",
+        "ΔDPS/千金 脆", "ΔDPS/千金 坦", "ΔEHP/千金",
+    )
 
     COL_NAME = 0
     COL_GOLD = 1
     COL_CANONICAL = 2
     COL_LEAST_SQUARES = 3
     COL_DELTA = 4
+    COL_DPS_SQUISHY = 5
+    COL_DPS_TANK = 6
+    COL_EHP = 7
 
-    _NUMERIC_COLUMNS = (COL_GOLD, COL_CANONICAL, COL_LEAST_SQUARES, COL_DELTA)
+    _NUMERIC_COLUMNS = (
+        COL_GOLD, COL_CANONICAL, COL_LEAST_SQUARES, COL_DELTA,
+        COL_DPS_SQUISHY, COL_DPS_TANK, COL_EHP,
+    )
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._rows: list[ItemComparison] = []
+        # item_id → MarginalResult；None = 無脈絡（全域視角），三欄顯示「—」
+        self._marginals: dict[int, object] | None = None
 
     # ---- 資料設定 ----
 
@@ -35,6 +46,27 @@ class ItemTableModel(QAbstractTableModel):
         self.beginResetModel()
         self._rows = list(comparisons)
         self.endResetModel()
+
+    def set_marginals(self, marginals: dict[int, object] | None) -> None:
+        """注入邊際效益（item_id → MarginalResult）。None = 顯示「—」。"""
+        self._marginals = marginals
+        if self._rows:
+            self.dataChanged.emit(
+                self.index(0, self.COL_DPS_SQUISHY),
+                self.index(len(self._rows) - 1, self.COL_EHP),
+            )
+
+    def _marginal_value(self, item_id: int, column: int) -> float | None:
+        if self._marginals is None:
+            return None
+        result = self._marginals.get(item_id)
+        if result is None:
+            return None
+        if column == self.COL_DPS_SQUISHY:
+            return result.dps_per_1k.get("squishy")
+        if column == self.COL_DPS_TANK:
+            return result.dps_per_1k.get("tank")
+        return result.ehp_per_1k
 
     def comparison_at(self, row: int) -> ItemComparison | None:
         if 0 <= row < len(self._rows):
@@ -83,15 +115,25 @@ class ItemTableModel(QAbstractTableModel):
                 return f"{row.least_squares.ratio * 100:.1f}%"
             case self.COL_DELTA:
                 return f"{row.delta * 100:+.1f}"
+            case self.COL_DPS_SQUISHY | self.COL_DPS_TANK | self.COL_EHP:
+                value = self._marginal_value(row.item.item_id, column)
+                return "—" if value is None else f"{value:+.1f}"
         return None
 
     def sort(self, column: int, order=Qt.SortOrder.AscendingOrder) -> None:
+        def marginal_key(c, col):
+            value = self._marginal_value(c.item.item_id, col)
+            return value if value is not None else float("-inf")  # 無資料排最後
+
         keys = {
             self.COL_NAME: lambda c: c.item.name,
             self.COL_GOLD: lambda c: c.item.total_gold,
             self.COL_CANONICAL: lambda c: c.canonical.ratio,
             self.COL_LEAST_SQUARES: lambda c: c.least_squares.ratio,
             self.COL_DELTA: lambda c: c.delta,
+            self.COL_DPS_SQUISHY: lambda c: marginal_key(c, self.COL_DPS_SQUISHY),
+            self.COL_DPS_TANK: lambda c: marginal_key(c, self.COL_DPS_TANK),
+            self.COL_EHP: lambda c: marginal_key(c, self.COL_EHP),
         }
         key = keys.get(column)
         if key is None:

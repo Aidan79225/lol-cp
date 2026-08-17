@@ -48,7 +48,10 @@ def test_headers_match_the_spec_layout(model):
         model.headerData(c, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
         for c in range(model.columnCount())
     ]
-    assert headers == ["裝備", "售價", "權威", "平方", "差異"]
+    assert headers == [
+        "裝備", "售價", "權威", "平方", "差異",
+        "ΔDPS/千金 脆", "ΔDPS/千金 坦", "ΔEHP/千金",
+    ]
 
 
 def test_name_and_gold_columns(model):

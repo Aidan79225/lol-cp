@@ -74,3 +74,55 @@ def test_weight_panel_follows_profile_switching(window):
     assert w._weight_panel._sliders[StatKey.AD].isEnabled()
     select_champion(w, "全域")
     assert not w._weight_panel._sliders[StatKey.AD].isEnabled()
+
+
+# ---- 邊際效益欄（Task 5 整合） ----
+
+from lolcp.presentation.item_table_model import ItemTableModel
+
+
+def marginal_cell(w: MainWindow, item_id: int, column: int) -> str:
+    for r in range(w._model.rowCount()):
+        c = w._model.comparison_at(r)
+        if c.item.item_id == item_id:
+            return w._model.data(w._model.index(r, column))
+    raise AssertionError(f"表格裡沒有 {item_id}")
+
+
+def test_global_view_shows_dashes_in_marginal_columns(window):
+    w, _ = window
+    assert marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY) == "—"
+
+
+def test_marginal_columns_activate_for_a_champion(window):
+    w, _ = window
+    select_champion(w, "達瑞文")
+    cell = marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY)
+    assert cell != "—"
+    assert float(cell) > 0
+
+
+def test_build_context_raises_ie_marginal_through_the_ui(window):
+    """協同貫穿到 UI：雙擊蒐集者+披風入裝後，無盡的 ΔDPS/千金 上升。"""
+    w, _ = window
+    select_champion(w, "達瑞文")
+    before = float(marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY))
+
+    for iid in (6676, 1018):
+        for r in range(w._model.rowCount()):
+            if w._model.comparison_at(r).item.item_id == iid:
+                w._on_row_double_clicked(w._model.index(r, 0))
+                break
+
+    assert w._build_bar.build_ids == (6676, 1018)
+    after = float(marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY))
+    assert after > before
+
+
+def test_level_change_recomputes_marginals(window):
+    w, _ = window
+    select_champion(w, "達瑞文")
+    before = marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY)
+    w._build_bar._level_spin.setValue(1)  # 低等級基礎攻速低 → 邊際值改變
+    after = marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY)
+    assert after != before

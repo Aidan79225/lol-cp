@@ -23,6 +23,7 @@ from lolcp.presentation.item_table_model import ItemTableModel
 from lolcp.presentation.widgets.detail_panel import DetailPanel
 from lolcp.presentation.widgets.filter_bar import FilterBar
 from lolcp.presentation.widgets.profile_selector import ProfileSelector
+from lolcp.presentation.widgets.build_bar import BuildBar
 from lolcp.presentation.widgets.status_bar import StatusBarWidget
 from lolcp.presentation.widgets.weight_panel import WeightPanel
 
@@ -58,6 +59,10 @@ class MainWindow(QMainWindow):
         top.addWidget(self._progress)
         top.addWidget(self._refresh)
 
+        self._build_bar = BuildBar(self)
+        self._build_bar.build_changed.connect(self._refresh_marginals)
+        self._build_bar.level_changed.connect(lambda _lv: self._refresh_marginals())
+
         self._model = ItemTableModel(self)
         self._table = QTableView(self)
         self._table.setModel(self._model)
@@ -67,6 +72,7 @@ class MainWindow(QMainWindow):
             QHeaderView.ResizeMode.Stretch
         )
         self._table.selectionModel().currentRowChanged.connect(self._on_row_changed)
+        self._table.doubleClicked.connect(self._on_row_double_clicked)
 
         self._detail = DetailPanel(self)
         self._weight_panel = WeightPanel(self)
@@ -85,6 +91,7 @@ class MainWindow(QMainWindow):
         central = QWidget(self)
         layout = QVBoxLayout(central)
         layout.addLayout(top)
+        layout.addWidget(self._build_bar)
         layout.addWidget(splitter, 1)
         self.setCentralWidget(central)
 
@@ -117,6 +124,7 @@ class MainWindow(QMainWindow):
             self._filter.select_tag(current_tag)
         self._apply_filter()
         self._refresh_weight_panel()
+        self._refresh_marginals()
         if self._sync_result is not None:
             self._status.update_status(self._sync_result, self._diagnostics)
 
@@ -132,6 +140,23 @@ class MainWindow(QMainWindow):
 
     def _on_row_changed(self, current, _previous) -> None:
         self._detail.show_comparison(self._model.comparison_at(current.row()))
+
+    def _on_row_double_clicked(self, index) -> None:
+        comparison = self._model.comparison_at(index.row())
+        if comparison is not None:
+            self._build_bar.add_item(comparison.item)
+
+    def _refresh_marginals(self) -> None:
+        champion = self._profile.current_champion()
+        if self._compute_marginals is None:
+            self._model.set_marginals(None)
+            return
+        results = self._compute_marginals.execute(
+            champion, self._build_bar.level, self._build_bar.build_ids
+        )
+        self._model.set_marginals(
+            {r.item.item_id: r for r in results} if results else None
+        )
 
     def _refresh_weight_panel(self) -> None:
         champion = self._profile.current_champion()
