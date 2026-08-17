@@ -99,3 +99,29 @@ def test_duplicate_champion_names_raise(tmp_path, diagnostics):
         )
     with pytest.raises(DuplicateChampionNameError, match="同名"):
         FileChampionRepository(tmp_path, diagnostics).all_champions()
+
+
+def test_missing_zh_entry_falls_back_to_english_and_is_recorded(tmp_path, diagnostics):
+    """zh_TW 缺條目時用 en_US 名稱頂替並記入診斷 —— 不靜默。"""
+    (tmp_path / "ddragon_champions_en_US.json").write_text(
+        json.dumps({"data": {
+            "A": {"key": "1", "name": "Aatrox", "tags": ["Fighter"], "partype": "None"},
+        }}),
+        encoding="utf-8",
+    )
+    (tmp_path / "ddragon_champions_zh_TW.json").write_text(
+        json.dumps({"data": {}}), encoding="utf-8"
+    )
+    champions = FileChampionRepository(tmp_path, diagnostics).all_champions()
+    assert champions[0].name == "Aatrox"  # 英文名頂替
+    assert diagnostics.missing_locale_entries == ("A",)
+
+
+def test_two_item_repositories_do_not_share_a_cache(diagnostics):
+    """lru_cache 掛在方法上是類別層級、maxsize=1 —— 兩個不同版本目錄的
+    repository 交替呼叫會互相踢出快取並重複累加診斷。改用實例快取。"""
+    repo_a = FileItemRepository(FIXTURES, ItemMapper(diagnostics))
+    repo_b = FileItemRepository(FIXTURES, ItemMapper(diagnostics))
+    first_a = repo_a.all_items()
+    repo_b.all_items()
+    assert repo_a.all_items() is first_a  # repo_b 的呼叫不可踢掉 repo_a 的快取

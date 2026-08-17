@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from functools import lru_cache
 from pathlib import Path
 
 from lolcp.domain.entities import Item
@@ -17,12 +16,17 @@ class FileItemRepository:
     def __init__(self, patch_dir: Path, mapper: ItemMapper) -> None:
         self._patch_dir = patch_dir
         self._mapper = mapper
+        # 實例層級快取（與 FileChampionRepository 同型）。lru_cache 掛在
+        # 方法上是類別層級、maxsize=1，兩個不同版本目錄的實例會互踢，
+        # 且每次重算都對共用的 Diagnostics 重複累加。
+        self._cache: tuple[Item, ...] | None = None
 
-    @lru_cache(maxsize=1)  # noqa: B019 — 每個 repository 實例對應一個固定版本目錄
     def all_items(self) -> tuple[Item, ...]:
-        dd = self._load(ITEMS_FILE)["data"]
-        binn = self._load(BIN_FILE)
-        return self._mapper.map_all(dd, binn)
+        if self._cache is None:
+            dd = self._load(ITEMS_FILE)["data"]
+            binn = self._load(BIN_FILE)
+            self._cache = self._mapper.map_all(dd, binn)
+        return self._cache
 
     def _load(self, filename: str) -> dict:
         path = self._patch_dir / filename

@@ -52,3 +52,12 @@ def test_summary_line_reports_every_category():
 
 def test_clean_run_summary_says_so():
     assert "無異常" in Diagnostics().summary_line()
+
+
+def test_missing_locale_entry_is_recorded():
+    """zh_TW 缺某英雄條目時以英文名頂替 —— 這個 fallback 必須留痕，
+    不可靜默（絕不靜默丟棄原則）。"""
+    diagnostics = Diagnostics()
+    diagnostics.missing_locale_entry("Weird")
+    assert diagnostics.missing_locale_entries == ("Weird",)
+    assert "在地化缺項 1 隻" in diagnostics.summary_line()

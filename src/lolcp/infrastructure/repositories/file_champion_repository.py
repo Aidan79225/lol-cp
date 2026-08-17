@@ -50,7 +50,10 @@ class FileChampionRepository:
             numeric_id = int(en_entry["key"])
             if numeric_id >= MAX_STANDARD_CHAMPION_ID:
                 continue
-            zh_entry = zh.get(key, en_entry)
+            zh_entry = zh.get(key)
+            if zh_entry is None:
+                self._diagnostics.missing_locale_entry(key)  # 英文名頂替要留痕
+                zh_entry = en_entry
             champions.append(
                 Champion(
                     key=key,

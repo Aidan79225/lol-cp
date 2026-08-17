@@ -32,6 +32,7 @@ class Diagnostics:
     _low_confidence: dict[StatKey, int] = field(default_factory=dict)
     _unknown_partypes: list[str] = field(default_factory=list)
     _unknown_roles: list[str] = field(default_factory=list)
+    _missing_locale_entries: list[str] = field(default_factory=list)
 
     # ---- 記錄 ----
 
@@ -54,6 +55,10 @@ class Diagnostics:
 
     def unknown_role(self, tag: str) -> None:
         self._unknown_roles.append(tag)
+
+    def missing_locale_entry(self, champion_key: str) -> None:
+        """zh_TW 缺此英雄條目，顯示名以 en_US 頂替。"""
+        self._missing_locale_entries.append(champion_key)
 
     # ---- 查詢 ----
 
@@ -81,6 +86,10 @@ class Diagnostics:
     def unknown_roles(self) -> tuple[str, ...]:
         return tuple(self._unknown_roles)
 
+    @property
+    def missing_locale_entries(self) -> tuple[str, ...]:
+        return tuple(self._missing_locale_entries)
+
     def summary_line(self) -> str:
         parts: list[str] = []
         if self._unknown_bin_fields:
@@ -95,4 +104,6 @@ class Diagnostics:
             parts.append(f"未知資源類型 {len(self._unknown_partypes)} 隻")
         if self._unknown_roles:
             parts.append(f"未知角色標籤 {len(set(self._unknown_roles))} 種")
+        if self._missing_locale_entries:
+            parts.append(f"在地化缺項 {len(set(self._missing_locale_entries))} 隻")
         return "  |  ".join(parts) if parts else "無異常"
