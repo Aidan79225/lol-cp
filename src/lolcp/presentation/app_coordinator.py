@@ -12,8 +12,6 @@ connection 才會把呼叫 queue 回主執行緒。
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from PySide6.QtCore import QObject, Slot
 from PySide6.QtWidgets import QMessageBox
 
@@ -24,7 +22,7 @@ from lolcp.presentation.main_window import MainWindow
 class AppCoordinator(QObject):
     def __init__(
         self,
-        build: Callable[[str], tuple],  # version -> (list_valuations, champions, adjust_weights)
+        build,   # version -> UseCaseBundle
         diagnostics: Diagnostics,
         thread,   # QThread；只用到 start/quit
         app,      # QApplication；只用到 quit
@@ -45,14 +43,11 @@ class AppCoordinator(QObject):
     @Slot(object)
     def on_finished(self, result) -> None:
         if self._window is None:
-            list_valuations, champions, adjust_weights = self._build(result.version)
-            self._window = MainWindow(
-                list_valuations, champions, self._diagnostics, adjust_weights
-            )
+            self._window = MainWindow(self._build(result.version), self._diagnostics)
             self._window.refresh_button.clicked.connect(self._on_refresh_clicked)
             self._window.show()
         elif result.version != self._version:
-            self._window.set_use_cases(*self._build(result.version))
+            self._window.set_use_cases(self._build(result.version))
         self._version = result.version
         self._window.on_sync_finished(result)
         self._thread.quit()

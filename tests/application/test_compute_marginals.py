@@ -1,0 +1,68 @@
+"""ComputeMarginals：fixture 全裝備 × 達瑞文真實基礎值。"""
+
+from pathlib import Path
+
+import pytest
+
+from lolcp.application.use_cases.compute_marginals import ComputeMarginals
+from lolcp.domain.combat import CombatModel
+from lolcp.domain.diagnostics import Diagnostics
+from lolcp.domain.entities import Champion
+from lolcp.infrastructure.mapping import ItemMapper
+from lolcp.infrastructure.repositories.file_champion_repository import (
+    FileChampionRepository,
+)
+from lolcp.infrastructure.repositories.file_item_repository import FileItemRepository
+from lolcp.infrastructure.repositories.toml_config import load_combat_config
+
+FIXTURES = Path(__file__).parent.parent / "fixtures" / "16.15.1"
+CONFIG = Path(__file__).parent.parent.parent / "config"
+
+
+@pytest.fixture(scope="module")
+def use_case():
+    diagnostics = Diagnostics()
+    proxy, targets = load_combat_config(CONFIG / "combat_model.toml")
+    return ComputeMarginals(
+        items=FileItemRepository(FIXTURES, ItemMapper(diagnostics)),
+        model=CombatModel(proxy),
+        targets=targets,
+    ), FileChampionRepository(FIXTURES, diagnostics)
+
+
+def test_returns_one_result_per_item(use_case):
+    compute, champions = use_case
+    draven = champions.by_key("Draven")
+    results = compute.execute(draven, 11, ())
+    assert len(results) == len(compute.items.all_items())
+
+
+def test_none_champion_yields_empty(use_case):
+    compute, _ = use_case
+    assert compute.execute(None, 11, ()) == ()
+
+
+def test_champion_without_base_stats_yields_empty(use_case):
+    compute, _ = use_case
+    ghost = Champion("Ghost", 1, "無數值", ("Mage",), "Mana", base_stats=None)
+    assert compute.execute(ghost, 11, ()) == ()
+
+
+def test_build_ids_change_the_marginals(use_case):
+    """出裝脈絡生效：蒐集者+靈巧披風在手後，無盡之刃的邊際值上升。"""
+    compute, champions = use_case
+    draven = champions.by_key("Draven")
+
+    def ie_dps(build_ids):
+        results = compute.execute(draven, 11, build_ids)
+        return next(r for r in results if r.item.item_id == 3031).dps_per_1k["squishy"]
+
+    assert ie_dps((6676, 1018)) > ie_dps(())
+
+
+def test_unknown_build_ids_are_ignored(use_case):
+    compute, champions = use_case
+    draven = champions.by_key("Draven")
+    with_ghost = compute.execute(draven, 11, (999999,))
+    without = compute.execute(draven, 11, ())
+    assert with_ghost == without

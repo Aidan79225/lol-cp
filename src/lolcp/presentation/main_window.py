@@ -16,8 +16,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from lolcp.application.use_cases.adjust_champion_weight import AdjustChampionWeight
-from lolcp.application.use_cases.list_valuations import ListValuations
 from lolcp.application.use_cases.sync_game_data import SyncResult
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import Champion
@@ -30,21 +28,16 @@ from lolcp.presentation.widgets.weight_panel import WeightPanel
 
 
 class MainWindow(QMainWindow):
-    def __init__(
-        self,
-        list_valuations: ListValuations,
-        champions: tuple[Champion, ...],
-        diagnostics: Diagnostics,
-        adjust_weights: AdjustChampionWeight | None = None,
-        parent=None,
-    ) -> None:
+    def __init__(self, bundle, diagnostics: Diagnostics, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("lol-cp — 召喚峽谷裝備 CP值")
         self.resize(1100, 700)
 
-        self._list_valuations = list_valuations
+        self._list_valuations = bundle.list_valuations
         self._diagnostics = diagnostics
-        self._adjust_weights = adjust_weights
+        self._adjust_weights = bundle.adjust_weights
+        self._compute_marginals = bundle.compute_marginals
+        champions = bundle.champions
         self._sync_result: SyncResult | None = None
         self._all_comparisons: tuple = ()
 
@@ -107,16 +100,12 @@ class MainWindow(QMainWindow):
         self._progress.setMaximum(total or 0)
         self._progress.setValue(done)
 
-    def set_use_cases(
-        self,
-        list_valuations: ListValuations,
-        champions: tuple[Champion, ...],
-        adjust_weights: AdjustChampionWeight | None = None,
-    ) -> None:
+    def set_use_cases(self, bundle) -> None:
         """換版本後注入新的 use case 與英雄清單。視角重設為全域。"""
-        self._list_valuations = list_valuations
-        self._adjust_weights = adjust_weights
-        self._profile.set_champions(champions)
+        self._list_valuations = bundle.list_valuations
+        self._adjust_weights = bundle.adjust_weights
+        self._compute_marginals = bundle.compute_marginals
+        self._profile.set_champions(bundle.champions)
 
     def reload(self) -> None:
         champion = self._profile.current_champion()

@@ -10,9 +10,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from lolcp.application.use_cases.adjust_champion_weight import AdjustChampionWeight
+from lolcp.application.use_cases.compute_marginals import ComputeMarginals
 from lolcp.application.use_cases.list_valuations import ListValuations
 from lolcp.application.use_cases.sync_game_data import SyncGameData
+from lolcp.domain.combat import CombatModel
 from lolcp.domain.diagnostics import Diagnostics
+from lolcp.domain.entities import Champion
 from lolcp.domain.pricing import CanonicalDeriver, LeastSquaresDeriver
 from lolcp.domain.valuation import LinearValuation
 from lolcp.domain.weights import ResourceRule, WeightResolver
@@ -26,12 +29,23 @@ from lolcp.infrastructure.repositories.file_champion_repository import (
 from lolcp.infrastructure.repositories.file_item_repository import FileItemRepository
 from lolcp.infrastructure.repositories.toml_config import (
     load_anchors,
+    load_combat_config,
     load_role_defaults,
 )
 from lolcp.infrastructure.repositories.toml_overrides_store import TomlOverridesStore
 
 DEFAULT_CACHE_ROOT = Path.home() / ".cache" / "lol-cp"
 CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config"
+
+
+@dataclass
+class UseCaseBundle:
+    """資料就緒後組裝出的 use case 集合。三元組長到第四個成員前改用具名欄位。"""
+
+    list_valuations: ListValuations
+    champions: tuple[Champion, ...]
+    adjust_weights: AdjustChampionWeight
+    compute_marginals: ComputeMarginals
 
 
 @dataclass
@@ -56,7 +70,7 @@ def build_application(
     )
 
 
-def build_use_cases(context: AppContext, version: str):
+def build_use_cases(context: AppContext, version: str) -> UseCaseBundle:
     """資料就緒後才能組裝 —— repository 需要知道版本目錄。"""
     patch_dir = context.cache.dir_for(version)
     diagnostics = context.diagnostics
@@ -79,7 +93,16 @@ def build_use_cases(context: AppContext, version: str):
         valuation=LinearValuation(),
     )
     adjust_weights = AdjustChampionWeight(overrides_store, weight_resolver)
-    return list_valuations, champions.all_champions(), adjust_weights
+    proxy, targets = load_combat_config(context.config_dir / "combat_model.toml")
+    compute_marginals = ComputeMarginals(
+        items=items, model=CombatModel(proxy), targets=targets
+    )
+    return UseCaseBundle(
+        list_valuations=list_valuations,
+        champions=champions.all_champions(),
+        adjust_weights=adjust_weights,
+        compute_marginals=compute_marginals,
+    )
 
 
 def main() -> int:

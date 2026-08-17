@@ -25,8 +25,7 @@ def window(tmp_path):
     config_dir = tmp_path / "config"
     shutil.copytree(CONFIG, config_dir)
     context = build_application(cache_root=cache_root, config_dir=config_dir)
-    list_valuations, champions, adjust = build_use_cases(context, "16.15.1")
-    w = MainWindow(list_valuations, champions, context.diagnostics, adjust)
+    w = MainWindow(build_use_cases(context, "16.15.1"), context.diagnostics)
     w.reload()
     return w, config_dir
 
