@@ -125,3 +125,29 @@ def test_two_item_repositories_do_not_share_a_cache(diagnostics):
     first_a = repo_a.all_items()
     repo_b.all_items()
     assert repo_a.all_items() is first_a  # repo_b 的呼叫不可踢掉 repo_a 的快取
+
+
+def test_champion_base_stats_are_parsed_from_en_us(diagnostics):
+    """達瑞文 16.15.1 實值：AD 62（成長 0）、攻速 0.679 + 2.7%/級。"""
+    draven = FileChampionRepository(FIXTURES, diagnostics).by_key("Draven")
+    base = draven.base_stats
+    assert base is not None
+    assert base.attack_damage == 62.0
+    assert base.attack_damage_growth == 0.0
+    assert base.attack_speed == 0.679
+    assert base.attack_speed_growth == 2.7
+    assert base.hp == 675.0
+    assert base.armor == 29.0
+
+
+def test_missing_stats_block_yields_none_not_crash(tmp_path, diagnostics):
+    for locale in ("zh_TW", "en_US"):
+        (tmp_path / f"ddragon_champions_{locale}.json").write_text(
+            json.dumps({"data": {
+                "A": {"key": "1", "name": "無數值", "tags": ["Mage"], "partype": "Mana"},
+            }}),
+            encoding="utf-8",
+        )
+    champion = FileChampionRepository(tmp_path, diagnostics).by_key("A")
+    assert champion is not None
+    assert champion.base_stats is None

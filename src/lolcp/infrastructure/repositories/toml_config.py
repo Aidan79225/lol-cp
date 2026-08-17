@@ -5,6 +5,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+from lolcp.domain.combat import SpellProxy, TargetProfile
 from lolcp.domain.pricing import AnchorConfig, AnchorEntry
 from lolcp.domain.stats import StatKey
 from lolcp.domain.weights import ChampionOverrides, RoleDefaults, StatWeights
@@ -74,3 +75,40 @@ def load_champion_overrides(directory: Path) -> ChampionOverrides:
         weights = _parse_weights(path.stem, raw)
         by_champion[path.stem] = dict(weights.weights)
     return ChampionOverrides(by_champion)
+
+
+def load_combat_config(path: Path) -> tuple[SpellProxy, tuple[TargetProfile, ...]]:
+    """讀取邊際效益模型常數。缺區塊、缺欄位都要大聲失敗。"""
+    raw = _read_toml(path)
+    proxy_raw = raw.get("spell_proxy")
+    if not isinstance(proxy_raw, dict):
+        raise ConfigError(f"{path.name} 缺少 [spell_proxy] 區塊")
+    try:
+        proxy = SpellProxy(
+            base_damage=float(proxy_raw["base_damage"]),
+            ap_ratio=float(proxy_raw["ap_ratio"]),
+            base_cooldown=float(proxy_raw["base_cooldown"]),
+        )
+    except KeyError as exc:
+        raise ConfigError(f"spell_proxy 缺少欄位 {exc.args[0]}") from exc
+
+    targets_raw = raw.get("targets")
+    if not isinstance(targets_raw, dict) or not targets_raw:
+        raise ConfigError(f"{path.name} 缺少 [targets.*] 區塊")
+    targets: list[TargetProfile] = []
+    for key, body in targets_raw.items():
+        if not isinstance(body, dict):
+            raise ConfigError(f"targets.{key} 的內容必須是表格")
+        for field in ("name", "armor", "magic_resist", "hp"):
+            if field not in body:
+                raise ConfigError(f"targets.{key} 缺少欄位 {field}")
+        targets.append(
+            TargetProfile(
+                key=key,
+                name=str(body["name"]),
+                armor=float(body["armor"]),
+                magic_resist=float(body["magic_resist"]),
+                hp=float(body["hp"]),
+            )
+        )
+    return proxy, tuple(targets)

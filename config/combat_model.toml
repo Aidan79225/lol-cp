@@ -1,0 +1,20 @@
+# 邊際效益模型的常數（spec 2026-08-17 §5）。
+# spell_proxy 三個常數是主觀擇定的基準技能 —— 可爭論、可修改。
+# targets 是取代「操作假設」的標準假想目標。
+
+[spell_proxy]
+base_damage = 300.0
+ap_ratio = 0.7
+base_cooldown = 8.0
+
+[targets.squishy]
+name = "脆皮"
+armor = 60.0
+magic_resist = 50.0
+hp = 1800.0
+
+[targets.tank]
+name = "坦克"
+armor = 200.0
+magic_resist = 120.0
+hp = 4000.0

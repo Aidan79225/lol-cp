@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 from lolcp.domain.diagnostics import Diagnostics
-from lolcp.domain.entities import Champion
+from lolcp.domain.entities import Champion, ChampionBaseStats
 
 ZH_FILE = "ddragon_champions_zh_TW.json"
 EN_FILE = "ddragon_champions_en_US.json"
@@ -61,6 +61,7 @@ class FileChampionRepository:
                     name=zh_entry["name"],
                     tags=tuple(en_entry.get("tags", ())),
                     partype=en_entry.get("partype", ""),
+                    base_stats=self._parse_base_stats(en_entry.get("stats")),
                 )
             )
         self._assert_unique_names(champions)
@@ -83,3 +84,24 @@ class FileChampionRepository:
         if not path.is_file():
             raise FileNotFoundError(f"快取檔案不存在：{path}")
         return json.loads(path.read_text(encoding="utf-8"))
+
+    @staticmethod
+    def _parse_base_stats(raw: dict | None) -> ChampionBaseStats | None:
+        """champion.json 的 stats 區塊 → 基礎數值。缺漏時回 None（邊際欄退化為「—」）。"""
+        if not isinstance(raw, dict):
+            return None
+        try:
+            return ChampionBaseStats(
+                attack_damage=float(raw["attackdamage"]),
+                attack_damage_growth=float(raw["attackdamageperlevel"]),
+                attack_speed=float(raw["attackspeed"]),
+                attack_speed_growth=float(raw["attackspeedperlevel"]),
+                hp=float(raw["hp"]),
+                hp_growth=float(raw["hpperlevel"]),
+                armor=float(raw["armor"]),
+                armor_growth=float(raw["armorperlevel"]),
+                magic_resist=float(raw["spellblock"]),
+                magic_resist_growth=float(raw["spellblockperlevel"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
