@@ -35,8 +35,13 @@ class Diagnostics:
     _missing_locale_entries: list[str] = field(default_factory=list)
     _unresolved_item_groups: Counter[str] = field(default_factory=Counter)
     _unsupported_formula_parts: Counter[str] = field(default_factory=Counter)
+    _unbound_item_effects: dict[int, tuple[str, ...]] = field(default_factory=dict)
 
     # ---- 記錄 ----
+
+    def unbound_item_effect(self, item_id: int, reasons: tuple[str, ...]) -> None:
+        """裝備被動綁定失敗（缺名稱或公式不支援）—— 該件效果已停用。"""
+        self._unbound_item_effects[item_id] = reasons
 
     def unsupported_formula_part(self, reason: str) -> None:
         """公式樹含 V1 不認識的組件型別或屬性代碼（已轉為 Unsupported）。"""
@@ -107,6 +112,10 @@ class Diagnostics:
     @property
     def unsupported_formula_parts(self) -> dict[str, int]:
         return dict(self._unsupported_formula_parts)
+
+    @property
+    def unbound_item_effects(self) -> dict[int, tuple[str, ...]]:
+        return dict(self._unbound_item_effects)
 
     def summary_line(self) -> str:
         parts: list[str] = []

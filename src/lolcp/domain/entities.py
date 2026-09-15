@@ -9,6 +9,8 @@ from lolcp.domain.formulas import Formula
 from lolcp.domain.stats import StatKey, StatLine
 
 MANA_PARTYPE = "Mana"
+# 實測：達瑞文 550、煞蜜拉 500（遠程），凱爾 175（近戰；6 級起靠被動變遠程，技能不在模型內）。
+RANGED_ATTACK_RANGE_THRESHOLD = 300.0
 
 
 @dataclass(frozen=True)
@@ -53,6 +55,14 @@ class Item:
     def stat_keys(self) -> frozenset[StatKey]:
         return frozenset(line.stat for line in self.stats)
 
+    @cached_property
+    def data_value_map(self) -> dict[str, float]:
+        return dict(self.data_values)
+
+    @cached_property
+    def calculation_map(self) -> dict[str, Formula]:
+        return dict(self.calculations)
+
 
 @dataclass(frozen=True)
 class ChampionBaseStats:
@@ -72,6 +82,13 @@ class ChampionBaseStats:
     armor_growth: float
     magic_resist: float
     magic_resist_growth: float
+    # champion.json attackrange。預設值僅為建構相容 —— repository 一律提供。
+    attack_range: float = 0.0
+
+    @property
+    def is_ranged(self) -> bool:
+        """命中特效分遠近程數值（spec 2026-09-15 §3.2）。"""
+        return self.attack_range >= RANGED_ATTACK_RANGE_THRESHOLD
 
 
 @dataclass(frozen=True)
