@@ -196,6 +196,18 @@ def test_status_bar_surfaces_unbound_passives():
     assert "被動綁定失敗 1 件" in widget.text()
 
 
+def test_status_bar_surfaces_champion_kit_problems():
+    diagnostics = Diagnostics()
+    diagnostics.unbound_champion_kit("Draven", ("calculation DravenSpinning.TotalDamage",))
+    diagnostics.missing_champion_spell("Samira")
+    widget = StatusBarWidget()
+    widget.update_status(
+        SyncResult(version="16.15.1", offline=False, downloaded=False), diagnostics
+    )
+    assert "技能模型綁定失敗 1 隻" in widget.text()
+    assert "英雄技能資料缺漏 1 隻" in widget.text()
+
+
 def test_unsupported_formula_parts_alone_keep_the_status_clean():
     """真實資料本來就有大量不支援的公式組件；沒被效果綁定就無害，
     顯示出來只會讓狀態列永遠不是「無異常」（spec 2026-09-15 §6 註）。"""

@@ -1,7 +1,7 @@
 # 英雄技能（Champion Kits V1）設計
 
 日期：2026-09-15
-狀態：研究完成，待核准
+狀態：已實作（2026-09-15）
 前置：`2026-09-15-item-passives-design.md`（傷害拆分、公式計算器、整場平均）、
 `2026-09-14-build-optimizer-design.md` §10 後續第 2 項
 

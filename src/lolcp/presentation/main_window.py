@@ -23,7 +23,7 @@ from lolcp.domain.item_effects import passive_status
 from lolcp.presentation.item_table_model import ItemTableModel
 from lolcp.presentation.widgets.detail_panel import DetailPanel
 from lolcp.presentation.widgets.filter_bar import FilterBar
-from lolcp.presentation.widgets.plan_panel import PlanPanel
+from lolcp.presentation.widgets.plan_panel import GENERIC_SKILLS, PlanPanel
 from lolcp.presentation.widgets.profile_selector import ProfileSelector
 from lolcp.presentation.widgets.build_bar import BuildBar
 from lolcp.presentation.widgets.status_bar import StatusBarWidget
@@ -42,6 +42,7 @@ class MainWindow(QMainWindow):
         self._compute_marginals = bundle.compute_marginals
         self._plan_build = bundle.plan_build
         self._item_effects = bundle.item_effects
+        self._champion_kits = bundle.champion_kits
         champions = bundle.champions
         self._sync_result: SyncResult | None = None
         self._all_comparisons: tuple = ()
@@ -126,6 +127,7 @@ class MainWindow(QMainWindow):
         self._compute_marginals = bundle.compute_marginals
         self._plan_build = bundle.plan_build
         self._item_effects = bundle.item_effects
+        self._champion_kits = bundle.champion_kits
         self._plan_panel.set_modelled_passives(len(self._item_effects))
         self._build_bar.clear()  # 舊版本的 Item 物件不可跨版本沿用
         self._profile.set_champions(bundle.champions)
@@ -134,6 +136,7 @@ class MainWindow(QMainWindow):
             self._plan_build.targets, self._plan_build.settings.beta
         )
         self._plan_panel.set_context(None)
+        self._refresh_skill_status(None)
 
     def reload(self) -> None:
         champion = self._profile.current_champion()
@@ -154,7 +157,16 @@ class MainWindow(QMainWindow):
     def _on_profile_changed(self, champion) -> None:
         # 只在換視角時重設規劃分頁 —— 權重提交也會 reload，但不影響規劃器。
         self._plan_panel.set_context(champion)
+        self._refresh_skill_status(champion)
         self.reload()
+
+    def _refresh_skill_status(self, champion) -> None:
+        """有技能模型的英雄標明操作假設的出處；其餘為泛用基準（spec champion-kits §9）。"""
+        if champion is not None and champion.key in self._champion_kits:
+            text = f"技能：已建模（熟練玩家假設，見 config/kits/{champion.key}.toml）"
+        else:
+            text = GENERIC_SKILLS
+        self._plan_panel.set_skill_status(text)
 
     def _on_plan_requested(self, target_key: str, beta: float) -> None:
         plan = self._plan_build.execute(

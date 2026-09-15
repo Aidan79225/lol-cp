@@ -217,6 +217,27 @@ def test_plan_panel_boundary_counts_bound_passives(window):
     assert "已計入 22 件裝備被動" in w._plan_panel._boundary.text()
 
 
+# ---- 英雄技能的誠實邊界（spec champion-kits §9） ----
+
+
+def select_champion_without_kit(w: MainWindow) -> None:
+    for i in range(w._profile.count()):
+        champion = w._profile.itemData(i)
+        if champion is not None and champion.key not in w._champion_kits:
+            w._profile.setCurrentIndex(i)
+            return
+    raise AssertionError("fixture 沒有無技能模型的英雄")
+
+
+def test_plan_panel_reports_the_skill_model_per_champion(window):
+    w, _, _ctx = window
+    select_champion(w, "達瑞文")
+    text = w._plan_panel._boundary.text()
+    assert "技能：已建模" in text and "config/kits/Draven.toml" in text
+    select_champion_without_kit(w)
+    assert "技能：泛用基準" in w._plan_panel._boundary.text()
+
+
 def test_version_switch_clears_the_build_bar(window):
     """set_use_cases 換版本後，舊版本的 Item 物件不可留在出裝列。"""
     w, _, _ctx = window

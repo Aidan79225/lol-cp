@@ -25,7 +25,7 @@
 
 **測試：** spec §10 公式擴充；三隻英雄真 bin 的 DataValues 陣列、冷卻、公式解析（Q `TotalDamage` 等）
 
-- [ ] Step 1 寫失敗測試 → Step 2 確認紅 → Step 3 實作 → Step 4 綠 + 全套件 → Step 5 提交
+- [x] Step 1 寫失敗測試 → Step 2 確認紅 → Step 3 實作 → Step 4 綠 + 全套件 → Step 5 提交
 
 ## Task 2: 管線 —— 英雄 bin 下載、舊快取補抓、fixture
 
@@ -33,7 +33,7 @@
 
 **測試：** 版本路徑 major.minor；缺英雄 bin 的完整快取觸發補抓且逐檔原子；repository 缺檔 → None＋診斷
 
-- [ ] 同五步驟（fixture 重建後既有斷言不變）
+- [x] 同五步驟（fixture 重建後既有斷言不變）
 
 ## Task 3: 技能等級與 kit 設定
 
@@ -41,7 +41,7 @@
 
 **測試：** spec §10 技能等級；設定未知鍵、缺鍵、型別、`skill_order` 必須是 Q/W/E 的排列
 
-- [ ] 同五步驟
+- [x] 同五步驟
 
 ## Task 4: 戰鬥窗口與三隻 kit
 
@@ -49,7 +49,7 @@
 
 **測試：** spec §10 各英雄與施放次數／持續率；綁定失敗退回泛用基準；無 kit 不變量
 
-- [ ] 同五步驟
+- [x] 同五步驟
 
 ## Task 5: 接線、效能、黃金快照
 
@@ -57,10 +57,10 @@
 
 **內容：** 16.16.1 實測規劃 ≤ 1 秒（超標做 spec §11 快取）；**三隻推薦彼此不同**寫成斷言
 
-- [ ] 同五步驟＋效能實測
+- [x] 同五步驟＋效能實測
 
 ## Task 6: UI 誠實邊界
 
 **Files:** Modify `widgets/plan_panel.py`、`diagnostics.py`、`main_window.py`；Test 追加 plan panel／widgets／整合測試
 
-- [ ] 同五步驟＋offscreen 截圖
+- [x] 同五步驟＋offscreen 截圖

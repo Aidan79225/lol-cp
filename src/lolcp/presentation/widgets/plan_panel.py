@@ -27,8 +27,9 @@ from lolcp.domain.build_planner import BuildPlan
 from lolcp.domain.combat import TargetProfile
 from lolcp.domain.entities import Champion
 
-# 誠實邊界：已建模的被動件數由組裝根告知；其餘這些規劃器看不見。
-BOUNDARY_TEMPLATE = "已計入 {count} 件裝備被動；未計入：移速、吸血與護盾、群體效果、英雄技能"
+# 誠實邊界：已建模的被動件數由組裝根告知、技能狀態依視角英雄而定；其餘規劃器看不見。
+BOUNDARY_TEMPLATE = "已計入 {count} 件裝備被動；{skills}；未計入：移速、吸血與護盾、群體效果"
+GENERIC_SKILLS = "技能：泛用基準"
 _HEADERS = ("順序", "裝備", "等級", "DPS", "EHP", "評分")
 _BETA_STEP = 0.05
 
@@ -67,8 +68,11 @@ class PlanPanel(QWidget):
 
         self._skipped_label = QLabel("", self)
         self._skipped_label.setWordWrap(True)
-        self._boundary = QLabel(BOUNDARY_TEMPLATE.format(count=0), self)
+        self._modelled_passives = 0
+        self._skill_status = GENERIC_SKILLS
+        self._boundary = QLabel("", self)
         self._boundary.setWordWrap(True)
+        self._render_boundary()
         self._apply_button = QPushButton("套用到出裝列", self)
         self._apply_button.setEnabled(False)
         self._apply_button.clicked.connect(lambda _checked=False: self.apply_requested.emit())
@@ -105,7 +109,18 @@ class PlanPanel(QWidget):
         self._beta_spin.setValue(default_beta)
 
     def set_modelled_passives(self, count: int) -> None:
-        self._boundary.setText(BOUNDARY_TEMPLATE.format(count=count))
+        self._modelled_passives = count
+        self._render_boundary()
+
+    def set_skill_status(self, text: str) -> None:
+        """「技能：已建模（…）」或 GENERIC_SKILLS —— 由主視窗依視角英雄決定。"""
+        self._skill_status = text
+        self._render_boundary()
+
+    def _render_boundary(self) -> None:
+        self._boundary.setText(
+            BOUNDARY_TEMPLATE.format(count=self._modelled_passives, skills=self._skill_status)
+        )
 
     def set_context(self, champion: Champion | None) -> None:
         """全域視角或無基礎值的英雄停用；換視角時舊結果失效，一律清空。"""

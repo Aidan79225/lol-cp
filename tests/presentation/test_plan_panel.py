@@ -119,4 +119,19 @@ def test_boundary_note_reports_how_many_passives_are_modelled():
     p = panel()
     p.set_modelled_passives(22)
     assert "已計入 22 件裝備被動" in p._boundary.text()
-    assert "英雄技能" in p._boundary.text()
+    assert "群體效果" in p._boundary.text()
+
+
+def test_boundary_note_defaults_to_the_generic_spell_proxy():
+    assert "技能：泛用基準" in panel()._boundary.text()
+
+
+def test_boundary_note_shows_the_skill_status_without_losing_the_passive_count():
+    """英雄技能已建模（spec champion-kits §9）—— 不再列為「未計入」。"""
+    p = panel()
+    p.set_modelled_passives(22)
+    p.set_skill_status("技能：已建模（熟練玩家假設，見 config/kits/Draven.toml）")
+    text = p._boundary.text()
+    assert "已計入 22 件裝備被動" in text
+    assert "config/kits/Draven.toml" in text
+    assert "英雄技能" not in text
