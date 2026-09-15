@@ -5,12 +5,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 
 from lolcp.application.ports import ItemRepository
 from lolcp.domain.build_planner import BuildPlan, BuildPlanner, PlannerSettings
-from lolcp.domain.combat import TargetProfile
+from lolcp.domain.combat import ChampionKitView, TargetProfile
 from lolcp.domain.entities import Champion
 
 
@@ -21,15 +21,22 @@ class PlanBuild:
         planner: BuildPlanner,
         targets: Sequence[TargetProfile],
         settings: PlannerSettings,
+        kits: Mapping[str, ChampionKitView] | None = None,
     ) -> None:
+        """kits：以英雄 key 索引的技能模型；沒有 kit 的英雄用泛用基準技能。"""
         self.items = items
         self._planner = planner
         self._targets = tuple(targets)
         self._settings = settings
+        self._kits = dict(kits or {})
 
     @property
     def targets(self) -> tuple[TargetProfile, ...]:
         return self._targets
+
+    @property
+    def kits(self) -> Mapping[str, ChampionKitView]:
+        return self._kits
 
     @property
     def settings(self) -> PlannerSettings:
@@ -58,4 +65,5 @@ class PlanBuild:
         all_items = self.items.all_items()
         by_id = {i.item_id: i for i in all_items}
         prefix = [by_id[i] for i in prefix_ids if i in by_id]
-        return self._planner.plan(champion.base_stats, target, all_items, prefix, settings)
+        planner = self._planner.for_champion(self._kits.get(champion.key))
+        return planner.plan(champion.base_stats, target, all_items, prefix, settings)

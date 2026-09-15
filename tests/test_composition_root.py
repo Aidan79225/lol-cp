@@ -38,6 +38,9 @@ def test_build_use_cases_produces_a_working_pipeline(tmp_path):
 
     assert len(bundle.item_effects) == 22
     assert context.diagnostics.unbound_item_effects == {}
+    assert set(bundle.champion_kits) == {"Draven", "Kayle", "Samira"}
+    assert context.diagnostics.unbound_champion_kits == {}
+    assert context.diagnostics.missing_champion_spells == ()
 
     draven = next(c for c in champions if c.key == "Draven")
     plan = bundle.plan_build.execute(draven, "squishy", None, ())

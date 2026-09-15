@@ -30,9 +30,21 @@ class SpellData:
     def cooldown(self, rank: int) -> float:
         return self.cooldowns[rank]
 
+    @cached_property
+    def _values_by_rank(self) -> dict[int, dict[str, float]]:
+        return {}
+
     def values_at(self, rank: int) -> dict[str, float]:
-        """該技能等級下的 data values —— 直接作為 FormulaContext.data_values。"""
-        return {name: values[rank] for name, values in self.data_values if rank < len(values)}
+        """該技能等級下的 data values —— 直接作為 FormulaContext.data_values。
+
+        每次 profile 都會查，依等級快取；回傳的 dict 為共用，呼叫端不得修改。
+        """
+        cache = self._values_by_rank
+        if rank not in cache:
+            cache[rank] = {
+                name: values[rank] for name, values in self.data_values if rank < len(values)
+            }
+        return cache[rank]
 
     def has_value(self, name: str) -> bool:
         return any(n == name for n, _ in self.data_values)

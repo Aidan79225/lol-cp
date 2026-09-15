@@ -222,11 +222,15 @@ class EffectContext(_ModifierWriter):
     fight: FightAssumptions
     stats: StatSheet
     modifiers: dict[str, float]
+    _formula_stats: dict | None = field(default=None, init=False, repr=False)
 
     def dv(self, name: str) -> float:
         return self.item.data_value_map[name]
 
     def calc(self, name: str) -> float:
+        """屬性表於本件第一次求值時取快照 —— 效果先讀後寫（史特拉克先算再加 AD）。"""
+        if self._formula_stats is None:
+            self._formula_stats = self.stats.formula_stats()
         return evaluate(
             self.item.calculation_map[name],
             FormulaContext(
@@ -234,7 +238,7 @@ class EffectContext(_ModifierWriter):
                 is_ranged=self.is_ranged,
                 data_values=self.item.data_value_map,
                 calculations=self.item.calculation_map,
-                stats=self.stats.formula_stats(),
+                stats=self._formula_stats,
             ),
         )
 
@@ -251,6 +255,7 @@ class KitContext(_ModifierWriter):
     fight: FightAssumptions
     stats: StatSheet
     modifiers: dict[str, float]
+    _formula_stats: dict | None = field(default=None, init=False, repr=False)
 
     @property
     def window(self) -> float:
@@ -281,6 +286,9 @@ class KitContext(_ModifierWriter):
         return self.spell(spell).values_at(rank)[name]
 
     def calc(self, spell: str, name: str, rank: int) -> float:
+        """屬性表整次套用只取一次快照 —— 技能只改攻速，不動公式讀的 AD／AP／生命／暴傷。"""
+        if self._formula_stats is None:
+            self._formula_stats = self.stats.formula_stats()
         data = self.spell(spell)
         return evaluate(
             data.calculation_map[name],
@@ -289,7 +297,7 @@ class KitContext(_ModifierWriter):
                 is_ranged=self.is_ranged,
                 data_values=data.values_at(rank),
                 calculations=data.calculation_map,
-                stats=self.stats.formula_stats(),
+                stats=self._formula_stats,
             ),
         )
 

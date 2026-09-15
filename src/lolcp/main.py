@@ -18,7 +18,12 @@ from lolcp.application.use_cases.sync_game_data import SyncGameData
 from lolcp.domain.build_planner import BuildPlanner
 from lolcp.domain.combat import CombatModel
 from lolcp.domain.diagnostics import Diagnostics
+from lolcp.domain.champion_kits import BoundKit, ChampionKitBinder
 from lolcp.domain.item_effects import ItemEffect, ItemEffectBinder
+from lolcp.infrastructure.champion_spell_mapper import ChampionSpellMapper
+from lolcp.infrastructure.repositories.file_champion_spells_repository import (
+    FileChampionSpellsRepository,
+)
 from lolcp.domain.spells import KIT_CHAMPION_KEYS
 from lolcp.domain.entities import Champion
 from lolcp.domain.pricing import CanonicalDeriver, LeastSquaresDeriver
@@ -35,6 +40,7 @@ from lolcp.infrastructure.repositories.file_item_repository import FileItemRepos
 from lolcp.infrastructure.repositories.toml_config import (
     load_anchors,
     load_combat_config,
+    load_kit_configs,
     load_planner_config,
     load_role_defaults,
 )
@@ -54,6 +60,7 @@ class UseCaseBundle:
     compute_marginals: ComputeMarginals
     plan_build: PlanBuild
     item_effects: Mapping[int, ItemEffect]   # 已綁定的被動（詳情面板與規劃分頁的誠實邊界）
+    champion_kits: Mapping[str, BoundKit]    # 已綁定的英雄技能模型（規劃分頁的誠實邊界）
 
 
 @dataclass
@@ -105,14 +112,20 @@ def build_use_cases(context: AppContext, version: str) -> UseCaseBundle:
     # 被動綁定只做一次；缺名或公式不支援的件記入診斷並停用（spec 2026-09-15 §5）。
     effects = ItemEffectBinder(diagnostics).bind(items.all_items())
     combat_model = CombatModel(proxy, fight, effects)
+    # 英雄技能模型：缺 bin 由 repository 留痕、綁定失敗由 binder 留痕，兩者皆退回泛用基準技能。
+    spells = FileChampionSpellsRepository(patch_dir, ChampionSpellMapper(diagnostics), diagnostics)
+    kits = ChampionKitBinder(diagnostics).bind(
+        spells.spells_for, load_kit_configs(context.config_dir / "kits")
+    )
     compute_marginals = ComputeMarginals(
-        items=items, model=combat_model, targets=targets
+        items=items, model=combat_model, targets=targets, kits=kits
     )
     plan_build = PlanBuild(
         items=items,
         planner=BuildPlanner(combat_model),
         targets=targets,
         settings=load_planner_config(context.config_dir / "build_planner.toml"),
+        kits=kits,
     )
     return UseCaseBundle(
         list_valuations=list_valuations,
@@ -121,6 +134,7 @@ def build_use_cases(context: AppContext, version: str) -> UseCaseBundle:
         compute_marginals=compute_marginals,
         plan_build=plan_build,
         item_effects=effects,
+        champion_kits=kits,
     )
 
 

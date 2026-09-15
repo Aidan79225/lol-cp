@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import permutations
 
-from lolcp.domain.combat import CombatModel, TargetProfile
+from lolcp.domain.combat import ChampionKitView, CombatModel, TargetProfile
 from lolcp.domain.entities import ChampionBaseStats, Item
 
 MAX_SLOTS = 6
@@ -88,6 +88,10 @@ _State = tuple[tuple[Item, ...], float, float]
 class BuildPlanner:
     def __init__(self, model: CombatModel) -> None:
         self._model = model
+
+    def for_champion(self, kit: ChampionKitView | None) -> BuildPlanner:
+        """帶英雄技能模型的規劃器；None 時回傳自身（泛用基準技能）。"""
+        return self if kit is None else BuildPlanner(self._model.for_champion(kit))
 
     def sequence_value(
         self,
@@ -240,9 +244,18 @@ class _Evaluator:
         self._target = target
         self._settings = settings
         self._naked_ehp: dict[int, float] = {}
+        self._memo: dict[tuple[int, ...], tuple[float, float, float]] = {}
 
     def score(self, build: tuple[Item, ...]) -> tuple[float, float, float]:
-        """(dps, ehp, score)；等級取 levels[件數 − 1]。"""
+        """(dps, ehp, score)；等級取 levels[件數 − 1]。
+
+        評分只取決於「哪些件」與件數，與順序無關 —— 以排序後的 ID 快取。
+        第 2 階段窮舉 5 件的 120 種排列只會出現 32 種不同前綴集合。
+        """
+        key = tuple(sorted(i.item_id for i in build))
+        cached = self._memo.get(key)
+        if cached is not None:
+            return cached
         level = self._settings.levels[len(build) - 1]
         profile = self._model.profile(self._base, level, build)
         dps = self._model.total_dps(profile, self._target)
@@ -251,7 +264,9 @@ class _Evaluator:
             self._naked_ehp[level] = self._model.mixed_ehp(
                 self._model.profile(self._base, level, ())
             )
-        return dps, ehp, dps * (ehp / self._naked_ehp[level]) ** self._settings.beta
+        result = (dps, ehp, dps * (ehp / self._naked_ehp[level]) ** self._settings.beta)
+        self._memo[key] = result
+        return result
 
     def start(self, prefix: tuple[Item, ...]) -> _State:
         state: _State = ((), 0.0, 0.0)

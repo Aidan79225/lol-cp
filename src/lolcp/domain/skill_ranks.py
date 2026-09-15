@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import lru_cache
 
 BASIC_SLOTS = ("Q", "W", "E")
 ULTIMATE = "R"
@@ -26,7 +27,12 @@ def validate_skill_order(order: Sequence[str]) -> tuple[str, ...]:
 
 
 def skill_ranks(level: int, skill_order: Sequence[str]) -> dict[str, int]:
-    order = validate_skill_order(skill_order)
+    return dict(_skill_ranks(level, validate_skill_order(skill_order)))
+
+
+@lru_cache(maxsize=None)
+def _skill_ranks(level: int, order: tuple[str, ...]) -> tuple[tuple[str, int], ...]:
+    """每次 profile 都會呼叫 —— 輸入只有 18 × 6 種組合，快取。"""
     if not 1 <= level <= MAX_LEVEL:
         raise ValueError(f"英雄等級必須在 1～{MAX_LEVEL}，得到 {level}")
     ranks = {slot: 0 for slot in (*BASIC_SLOTS, ULTIMATE)}
@@ -41,4 +47,4 @@ def skill_ranks(level: int, skill_order: Sequence[str]) -> dict[str, int]:
         else:
             pick = next(s for s in order if ranks[s] < cap)
         ranks[pick] += 1
-    return ranks
+    return tuple(ranks.items())
