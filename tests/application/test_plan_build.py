@@ -105,6 +105,24 @@ def test_prefix_ids_are_kept_and_components_reported(use_case):
     assert [i.item_id for i in plan.skipped] == [1018]
 
 
+# ---- 黃金快照（spec §8）：改版後推薦悄悄改變時，這是唯一的警報 ----
+
+
+def test_golden_draven_vs_squishy(use_case):
+    """無盡 → 狂戰士護脛 → 幻影之舞 → 狂暴利刃 → 多明尼克 → 嗜血者。"""
+    plan_build, champions = use_case
+    plan = plan_build.execute(champions.by_key("Draven"), "squishy", None, ())
+    assert [s.item.item_id for s in plan.steps] == [3031, 3006, 3046, 3097, 3036, 3072]
+
+
+def test_golden_draven_vs_tank_buys_dominik_earlier(use_case):
+    """打坦克時多明尼克從第 5 件提前到第 3 件 —— 百分比物穿對高護甲值錢
+    （與邊際效益 spec §8 同一條數學），規劃器自己排出了這個順序。"""
+    plan_build, champions = use_case
+    plan = plan_build.execute(champions.by_key("Draven"), "tank", None, ())
+    assert [s.item.item_id for s in plan.steps] == [3031, 3006, 3036, 3046, 3097, 3072]
+
+
 def test_unknown_prefix_ids_are_ignored(use_case):
     plan_build, champions = use_case
     draven = champions.by_key("Draven")

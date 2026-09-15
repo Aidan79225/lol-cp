@@ -61,7 +61,9 @@ class PlanPanel(QWidget):
         self._table.setHorizontalHeaderLabels(_HEADERS)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.verticalHeader().setVisible(False)
-        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header = self._table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # 裝備名最長，吃剩餘寬度
 
         self._skipped_label = QLabel("", self)
         self._skipped_label.setWordWrap(True)
