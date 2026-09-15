@@ -12,7 +12,9 @@ from pathlib import Path
 from lolcp.application.use_cases.adjust_champion_weight import AdjustChampionWeight
 from lolcp.application.use_cases.compute_marginals import ComputeMarginals
 from lolcp.application.use_cases.list_valuations import ListValuations
+from lolcp.application.use_cases.plan_build import PlanBuild
 from lolcp.application.use_cases.sync_game_data import SyncGameData
+from lolcp.domain.build_planner import BuildPlanner
 from lolcp.domain.combat import CombatModel
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import Champion
@@ -30,6 +32,7 @@ from lolcp.infrastructure.repositories.file_item_repository import FileItemRepos
 from lolcp.infrastructure.repositories.toml_config import (
     load_anchors,
     load_combat_config,
+    load_planner_config,
     load_role_defaults,
 )
 from lolcp.infrastructure.repositories.toml_overrides_store import TomlOverridesStore
@@ -46,6 +49,7 @@ class UseCaseBundle:
     champions: tuple[Champion, ...]
     adjust_weights: AdjustChampionWeight
     compute_marginals: ComputeMarginals
+    plan_build: PlanBuild
 
 
 @dataclass
@@ -94,14 +98,22 @@ def build_use_cases(context: AppContext, version: str) -> UseCaseBundle:
     )
     adjust_weights = AdjustChampionWeight(overrides_store, weight_resolver)
     proxy, targets = load_combat_config(context.config_dir / "combat_model.toml")
+    combat_model = CombatModel(proxy)
     compute_marginals = ComputeMarginals(
-        items=items, model=CombatModel(proxy), targets=targets
+        items=items, model=combat_model, targets=targets
+    )
+    plan_build = PlanBuild(
+        items=items,
+        planner=BuildPlanner(combat_model),
+        targets=targets,
+        settings=load_planner_config(context.config_dir / "build_planner.toml"),
     )
     return UseCaseBundle(
         list_valuations=list_valuations,
         champions=champions.all_champions(),
         adjust_weights=adjust_weights,
         compute_marginals=compute_marginals,
+        plan_build=plan_build,
     )
 
 

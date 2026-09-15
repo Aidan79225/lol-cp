@@ -36,6 +36,10 @@ def test_build_use_cases_produces_a_working_pipeline(tmp_path):
     assert ie.canonical.ratio * 100 == pytest.approx(103.6, abs=0.05)
     assert any(c.key == "Draven" for c in champions)
 
+    draven = next(c for c in champions if c.key == "Draven")
+    plan = bundle.plan_build.execute(draven, "squishy", None, ())
+    assert len(plan.steps) == 6
+
 
 def test_only_main_imports_presentation():
     """組裝根之外，任何模組都不得 import presentation。"""

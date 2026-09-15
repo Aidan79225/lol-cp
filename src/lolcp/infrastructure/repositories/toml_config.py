@@ -5,6 +5,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+from lolcp.domain.build_planner import MAX_SLOTS, PlannerSettings
 from lolcp.domain.combat import SpellProxy, TargetProfile
 from lolcp.domain.pricing import AnchorConfig, AnchorEntry
 from lolcp.domain.stats import StatKey
@@ -117,6 +118,58 @@ def load_combat_config(path: Path) -> tuple[SpellProxy, tuple[TargetProfile, ...
             )
         )
     return proxy, tuple(targets)
+
+
+_PLANNER_KEYS = ("levels", "final_holding_gold", "beta", "boots_slot", "beam_width")
+_MIN_LEVEL, _MAX_LEVEL = 1, 18
+
+
+def load_planner_config(path: Path) -> PlannerSettings:
+    """讀取出裝規劃器常數。未知鍵、缺鍵、型別、範圍錯誤都要大聲失敗。"""
+    raw = _read_toml(path)
+    unknown = set(raw) - set(_PLANNER_KEYS)
+    if unknown:
+        raise ConfigError(f"{path.name} 出現未知欄位 {sorted(unknown)}")
+    for key in _PLANNER_KEYS:
+        if key not in raw:
+            raise ConfigError(f"{path.name} 缺少欄位 {key}")
+
+    levels = raw["levels"]
+    if (
+        not isinstance(levels, list)
+        or len(levels) != MAX_SLOTS
+        or not all(_is_int(v) and _MIN_LEVEL <= v <= _MAX_LEVEL for v in levels)
+    ):
+        raise ConfigError(
+            f"levels 必須是 {MAX_SLOTS} 個 {_MIN_LEVEL}～{_MAX_LEVEL} 的整數，得到 {levels!r}"
+        )
+    beta = _required_number(raw, "beta", path.name)
+    if not 0.0 <= beta <= 1.0:
+        raise ConfigError(f"beta 必須在 0～1，得到 {beta}")
+    boots_slot = _required_int(raw, "boots_slot")
+    if not 0 <= boots_slot <= MAX_SLOTS:
+        raise ConfigError(f"boots_slot 必須在 0～{MAX_SLOTS}，得到 {boots_slot}")
+    beam_width = _required_int(raw, "beam_width")
+    if beam_width < 1:
+        raise ConfigError(f"beam_width 必須 ≥ 1，得到 {beam_width}")
+    return PlannerSettings(
+        levels=tuple(levels),
+        final_holding_gold=_required_number(raw, "final_holding_gold", path.name),
+        beta=beta,
+        boots_slot=boots_slot,
+        beam_width=beam_width,
+    )
+
+
+def _is_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _required_int(body: dict, field: str) -> int:
+    value = body[field]
+    if not _is_int(value):
+        raise ConfigError(f"{field} 必須是整數，得到 {value!r}")
+    return value
 
 
 def _required_number(body: dict, field: str, where: str) -> float:

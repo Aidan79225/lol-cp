@@ -34,7 +34,8 @@ def planner() -> BuildPlanner:
     return BuildPlanner(CombatModel(SpellProxy(base_damage=0.0, ap_ratio=0.0, base_cooldown=8.0)))
 
 
-def settings(beta=0.0, boots_slot=0, beam_width=40, final=3000.0) -> PlannerSettings:
+def settings(beta=0.0, boots_slot=0, beam_width=8, final=3000.0) -> PlannerSettings:
+    # 窄 beam：玩具池多為同質件；boots_slot=0 時第 2 階段每集合窮舉 720 種排列
     return PlannerSettings(
         levels=LEVELS, final_holding_gold=final, beta=beta,
         boots_slot=boots_slot, beam_width=beam_width,
