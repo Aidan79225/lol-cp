@@ -5,6 +5,7 @@ import pytest
 
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import GroupLimit
+from lolcp.domain.formulas import FormulaContext, FormulaStat, StatPart, Sum, evaluate, problems
 from lolcp.domain.stats import StatKey
 from lolcp.infrastructure.mapping import ItemMapper, looks_like_bin_stat_field
 
@@ -207,6 +208,83 @@ def test_unresolved_group_reference_is_recorded_not_dropped(mapper, diagnostics,
     items = mapper.map_all({"1036": dd_data["1036"]}, raw_bin)
     assert items[0].group_limits == ()
     assert diagnostics.unresolved_item_groups == {"{deadbeef}": 1}
+
+
+# ---- 被動資料：data values 與公式樹（spec 2026-09-15 §4.4）----
+
+
+def _formula_ctx(item, level=18, ranged=False, stats=None):
+    return FormulaContext(
+        level=level,
+        is_ranged=ranged,
+        data_values=dict(item.data_values),
+        calculations=dict(item.calculations),
+        stats=stats or {},
+    )
+
+
+def _calc(item, name):
+    return dict(item.calculations)[name]
+
+
+def test_data_values_are_read(mapper, dd_data, bin_data):
+    botrk = _by_id(mapper.map_all(dd_data, bin_data), 3153)
+    values = dict(botrk.data_values)
+    assert values["RangedValue"] == pytest.approx(0.06)
+    assert values["MeleeValue"] == pytest.approx(0.09)
+
+
+def test_kraken_damage_amount_formula_tree(mapper, dd_data, bin_data):
+    """ByCharLevelBreakpoints（每級加）＋ mRangedMultiplier 引用 data value。"""
+    kraken = _by_id(mapper.map_all(dd_data, bin_data), 6672)
+    formula = _calc(kraken, "DamageAmount")
+    assert [evaluate(formula, _formula_ctx(kraken, level=lv)) for lv in (8, 9, 18)] == [
+        pytest.approx(150.0), pytest.approx(155.0), pytest.approx(200.0)
+    ]
+    assert evaluate(formula, _formula_ctx(kraken, level=18, ranged=True)) == pytest.approx(160.0)
+
+
+def test_terminus_modified_calculation_chain(mapper, dd_data, bin_data):
+    """GameCalculationModified：ARMRMaxScaling = ARMRPerHitScaling × 3。"""
+    terminus = _by_id(mapper.map_all(dd_data, bin_data), 3302)
+    formula = _calc(terminus, "ARMRMaxScaling")
+    assert evaluate(formula, _formula_ctx(terminus, level=14)) == pytest.approx(24.0)
+
+
+def test_nashors_on_hit_scales_with_total_ap(mapper, dd_data, bin_data):
+    nashor = _by_id(mapper.map_all(dd_data, bin_data), 3115)
+    stats = {(FormulaStat.AP, StatPart.TOTAL): 100.0}
+    formula = _calc(nashor, "TotalOnHitDamage")
+    assert evaluate(formula, _formula_ctx(nashor, stats=stats)) == pytest.approx(30.0)
+
+
+def test_trinity_spellblade_scales_with_base_ad(mapper, dd_data, bin_data):
+    trinity = _by_id(mapper.map_all(dd_data, bin_data), 3078)
+    stats = {(FormulaStat.AD, StatPart.BASE): 62.0}
+    formula = _calc(trinity, "SpellbladeDamage")
+    assert evaluate(formula, _formula_ctx(trinity, stats=stats)) == pytest.approx(124.0)
+
+
+def test_unknown_stat_code_becomes_unsupported_and_is_counted(mapper, diagnostics, dd_data, bin_data):
+    """破敗的 {405deeb1} 用屬性代碼 13 —— V1 不認識，轉 Unsupported 並計數，不猜。"""
+    botrk = _by_id(mapper.map_all(dd_data, bin_data), 3153)
+    assert problems(_calc(botrk, "{405deeb1}"), dict(botrk.data_values), dict(botrk.calculations))
+    assert diagnostics.unsupported_formula_parts.get("mStat=13", 0) >= 1
+
+
+def test_unknown_part_type_becomes_unsupported(mapper, diagnostics, dd_data):
+    raw_bin = {
+        "Items/1036": {
+            "mFlatPhysicalDamageMod": 10.0,
+            "mItemCalculations": {
+                "Weird": {"mFormulaParts": [{"__type": "BrandNewCalculationPart"}], "__type": "GameCalculation"}
+            },
+        }
+    }
+    item = mapper.map_all({"1036": dd_data["1036"]}, raw_bin)[0]
+    assert isinstance(_calc(item, "Weird"), Sum)
+    assert problems(_calc(item, "Weird"), {}, {}) == ("unsupported BrandNewCalculationPart",)
+    assert diagnostics.unsupported_formula_parts == {"BrandNewCalculationPart": 1}
 
 
 def test_bin_mana_agrees_with_ddragon_and_is_kept(mapper, dd_data, bin_data):

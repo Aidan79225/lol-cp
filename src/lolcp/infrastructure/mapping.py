@@ -12,6 +12,7 @@ from collections.abc import Mapping
 
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import GroupLimit, Item
+from lolcp.infrastructure.formula_mapping import FormulaMapper
 from lolcp.domain.stats import (
     BIN_FIELD_TO_STAT,
     DDRAGON_FIELD_TO_STAT,
@@ -50,6 +51,7 @@ def looks_like_bin_stat_field(name: str, value: object) -> bool:
 class ItemMapper:
     def __init__(self, diagnostics: Diagnostics) -> None:
         self._diagnostics = diagnostics
+        self._formulas = FormulaMapper(diagnostics)
 
     def is_summoners_rift_standard(self, item_id: str, raw_dd: dict) -> bool:
         gold = raw_dd.get("gold", {})
@@ -89,7 +91,25 @@ class ItemMapper:
                 () if group_index is None
                 else self._resolve_group_limits(item_id, raw_bin, group_index)
             ),
+            data_values=self._map_data_values(raw_bin),
+            calculations=tuple(
+                (str(name), self._formulas.parse_calculation(body))
+                for name, body in (raw_bin.get("mItemCalculations") or {}).items()
+            ),
         )
+
+    @staticmethod
+    def _map_data_values(raw_bin: dict) -> tuple[tuple[str, float], ...]:
+        """mDataValues → (名稱, 數值)。bin 省略值為 0 的 mValue，缺省即 0。"""
+        values: list[tuple[str, float]] = []
+        for entry in raw_bin.get("mDataValues") or ():
+            if not isinstance(entry, dict) or "mName" not in entry:
+                continue
+            value = entry.get("mValue", 0.0)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            values.append((str(entry["mName"]), float(value)))
+        return tuple(values)
 
     def map_all(self, dd_data: dict[str, dict], bin_data: dict[str, dict]) -> tuple[Item, ...]:
         group_index = {

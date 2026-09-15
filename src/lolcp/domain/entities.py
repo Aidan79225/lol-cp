@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import cached_property
 
+from lolcp.domain.formulas import Formula
 from lolcp.domain.stats import StatKey, StatLine
 
 MANA_PARTYPE = "Mana"
@@ -34,6 +35,9 @@ class Item:
     epicness: int | None = None               # bin epicness：5 傳說、4 二階鞋與史詩部件
     upgrades: tuple[int, ...] = ()            # Data Dragon `into`
     group_limits: tuple[GroupLimit, ...] = () # 只含有上限的群組
+    # ---- 裝備被動用（spec 2026-09-15 §4.4）；tuple of pairs 保持 Item 可雜湊 ----
+    data_values: tuple[tuple[str, float], ...] = ()     # bin mDataValues
+    calculations: tuple[tuple[str, Formula], ...] = ()  # bin mItemCalculations
 
     def amount_of(self, stat: StatKey) -> float | None:
         """回傳屬性數量；沒有這條屬性回 None。

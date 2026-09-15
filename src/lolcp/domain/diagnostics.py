@@ -34,8 +34,13 @@ class Diagnostics:
     _unknown_roles: list[str] = field(default_factory=list)
     _missing_locale_entries: list[str] = field(default_factory=list)
     _unresolved_item_groups: Counter[str] = field(default_factory=Counter)
+    _unsupported_formula_parts: Counter[str] = field(default_factory=Counter)
 
     # ---- 記錄 ----
+
+    def unsupported_formula_part(self, reason: str) -> None:
+        """公式樹含 V1 不認識的組件型別或屬性代碼（已轉為 Unsupported）。"""
+        self._unsupported_formula_parts[reason] += 1
 
     def unresolved_item_group(self, group_ref: str, item_id: int) -> None:
         """裝備參照的 ItemGroup 不在 bin 最外層 —— 其持有上限無從得知。"""
@@ -98,6 +103,10 @@ class Diagnostics:
     @property
     def unresolved_item_groups(self) -> dict[str, int]:
         return dict(self._unresolved_item_groups)
+
+    @property
+    def unsupported_formula_parts(self) -> dict[str, int]:
+        return dict(self._unsupported_formula_parts)
 
     def summary_line(self) -> str:
         parts: list[str] = []
