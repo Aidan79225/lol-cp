@@ -7,6 +7,8 @@ from pathlib import Path
 
 from lolcp.domain.build_planner import MAX_SLOTS, PlannerSettings
 from lolcp.domain.combat import FightAssumptions, SpellProxy, TargetProfile
+from lolcp.domain.kit_settings import KIT_ASSUMPTIONS, KitSettings
+from lolcp.domain.skill_ranks import validate_skill_order
 from lolcp.domain.pricing import AnchorConfig, AnchorEntry
 from lolcp.domain.stats import StatKey
 from lolcp.domain.weights import ChampionOverrides, RoleDefaults, StatWeights
@@ -79,7 +81,7 @@ def load_champion_overrides(directory: Path) -> ChampionOverrides:
 
 
 _TARGET_FIELDS = {"name", "armor", "magic_resist", "hp", "bonus_hp"}
-_FIGHT_FIELDS = {"average_current_hp_ratio", "energized_attacks"}
+_FIGHT_FIELDS = {"average_current_hp_ratio", "energized_attacks", "fight_duration_seconds"}
 
 
 def load_combat_config(
@@ -141,7 +143,44 @@ def _parse_fight(body: object, path: Path) -> FightAssumptions:
     energized = _required_int(body, "energized_attacks")
     if energized < 1:
         raise ConfigError(f"fight.energized_attacks 必須 ≥ 1，得到 {energized}")
-    return FightAssumptions(average_current_hp_ratio=ratio, energized_attacks=energized)
+    duration = _required_number(body, "fight_duration_seconds", "fight")
+    if duration <= 0:
+        raise ConfigError(f"fight.fight_duration_seconds 必須 > 0，得到 {duration}")
+    return FightAssumptions(
+        average_current_hp_ratio=ratio,
+        energized_attacks=energized,
+        fight_duration_seconds=duration,
+    )
+
+
+def load_kit_config(path: Path, champion_key: str) -> KitSettings:
+    """讀取 config/kits/<Key>.toml：主升順序＋該英雄的操作假設（spec champion-kits §6）。"""
+    schema = KIT_ASSUMPTIONS.get(champion_key)
+    if schema is None:
+        raise ConfigError(f"{champion_key} 沒有技能模型，不應有 kit 設定檔")
+    raw = _read_toml(path)
+    unknown = set(raw) - {"skill_order"} - set(schema)
+    if unknown:
+        raise ConfigError(f"{path.name} 出現未知欄位 {sorted(unknown)}")
+    order = raw.get("skill_order")
+    if not isinstance(order, list) or not all(isinstance(s, str) for s in order):
+        raise ConfigError(f"{path.name} 的 skill_order 必須是字串陣列，得到 {order!r}")
+    try:
+        validate_skill_order(order)
+    except ValueError as exc:
+        raise ConfigError(f"{path.name}：{exc}") from None
+    assumptions: dict[str, float] = {}
+    for name, bounds in schema.items():
+        value = _required_number(raw, name, path.name)
+        if not bounds.low <= value <= bounds.high:
+            raise ConfigError(f"{path.name}.{name} 必須在 {bounds.low}～{bounds.high}，得到 {value}")
+        assumptions[name] = value
+    return KitSettings(champion_key=champion_key, skill_order=tuple(order), assumptions=assumptions)
+
+
+def load_kit_configs(directory: Path) -> dict[str, KitSettings]:
+    """設定檔隨 repo 發佈 —— 缺任何一隻都大聲失敗，不默默退回泛用基準。"""
+    return {key: load_kit_config(directory / f"{key}.toml", key) for key in KIT_ASSUMPTIONS}
 
 
 _PLANNER_KEYS = ("levels", "final_holding_gold", "beta", "boots_slot", "beam_width")

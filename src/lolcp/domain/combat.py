@@ -54,6 +54,8 @@ class FightAssumptions:
 
     average_current_hp_ratio: float  # 目標平均剩餘生命比；已損失 = 1 − 此值
     energized_attacks: int           # 充能普攻每幾下普攻觸發一次
+    # 技能模型的固定戰鬥時長（spec champion-kits §3）；設定檔必填，預設值僅為建構相容
+    fight_duration_seconds: float = 10.0
 
 
 @dataclass(frozen=True)

@@ -23,6 +23,7 @@ def test_loads_real_config():
     assert [t.bonus_hp for t in targets] == [300.0, 2000.0]
     assert fight.average_current_hp_ratio == 0.5
     assert fight.energized_attacks == 4
+    assert fight.fight_duration_seconds == 10.0
 
 
 # ---- 裝備被動的整場平均假設與目標額外生命（spec 2026-09-15 §3.3–§3.4）----
@@ -30,7 +31,7 @@ def test_loads_real_config():
 VALID = (
     "[spell_proxy]\nbase_damage = 300.0\nap_ratio = 0.7\nbase_cooldown = 8.0\n\n"
     '[targets.squishy]\nname = "x"\narmor = 60.0\nmagic_resist = 50.0\nhp = 1800.0\nbonus_hp = 300.0\n\n'
-    "[fight]\naverage_current_hp_ratio = 0.5\nenergized_attacks = 4\n"
+    "[fight]\naverage_current_hp_ratio = 0.5\nenergized_attacks = 4\nfight_duration_seconds = 10.0\n"
 )
 
 
@@ -65,6 +66,20 @@ def test_unknown_fight_key_is_rejected(tmp_path):
 def test_current_hp_ratio_must_be_within_zero_and_one(tmp_path):
     text = VALID.replace("average_current_hp_ratio = 0.5", "average_current_hp_ratio = 1.5")
     with pytest.raises(ConfigError, match="average_current_hp_ratio"):
+        load_combat_config(write(tmp_path, text))
+
+
+def test_fight_duration_must_be_positive(tmp_path):
+    """技能模型的固定戰鬥時長（spec champion-kits §3）。"""
+    for bad in ("0.0", "-5.0", '"ten"'):
+        text = VALID.replace("fight_duration_seconds = 10.0", f"fight_duration_seconds = {bad}")
+        with pytest.raises(ConfigError, match="fight_duration_seconds"):
+            load_combat_config(write(tmp_path, text))
+
+
+def test_missing_fight_duration_is_rejected(tmp_path):
+    text = VALID.replace("fight_duration_seconds = 10.0\n", "")
+    with pytest.raises(ConfigError, match="fight_duration_seconds"):
         load_combat_config(write(tmp_path, text))
 
 
