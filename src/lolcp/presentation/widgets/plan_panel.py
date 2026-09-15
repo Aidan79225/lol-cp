@@ -27,8 +27,8 @@ from lolcp.domain.build_planner import BuildPlan
 from lolcp.domain.combat import TargetProfile
 from lolcp.domain.entities import Champion
 
-# 誠實邊界：規劃器只看屬性物理三公式，這些東西它看不見。
-BOUNDARY_NOTE = "未計入：裝備被動、移速、吸血；英雄差異僅來自基礎數值"
+# 誠實邊界：已建模的被動件數由組裝根告知；其餘這些規劃器看不見。
+BOUNDARY_TEMPLATE = "已計入 {count} 件裝備被動；未計入：移速、吸血與護盾、群體效果、英雄技能"
 _HEADERS = ("順序", "裝備", "等級", "DPS", "EHP", "評分")
 _BETA_STEP = 0.05
 
@@ -67,7 +67,7 @@ class PlanPanel(QWidget):
 
         self._skipped_label = QLabel("", self)
         self._skipped_label.setWordWrap(True)
-        self._boundary = QLabel(BOUNDARY_NOTE, self)
+        self._boundary = QLabel(BOUNDARY_TEMPLATE.format(count=0), self)
         self._boundary.setWordWrap(True)
         self._apply_button = QPushButton("套用到出裝列", self)
         self._apply_button.setEnabled(False)
@@ -103,6 +103,9 @@ class PlanPanel(QWidget):
         for target in targets:
             self._target_combo.addItem(target.name, userData=target.key)
         self._beta_spin.setValue(default_beta)
+
+    def set_modelled_passives(self, count: int) -> None:
+        self._boundary.setText(BOUNDARY_TEMPLATE.format(count=count))
 
     def set_context(self, champion: Champion | None) -> None:
         """全域視角或無基礎值的英雄停用；換視角時舊結果失效，一律清空。"""

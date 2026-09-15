@@ -193,6 +193,30 @@ def test_switching_champion_clears_the_plan(window):
     assert not w._plan_panel.isEnabled()
 
 
+# ---- 裝備被動的誠實邊界（spec 2026-09-15 §6） ----
+
+
+def select_item(w: MainWindow, item_id: int) -> None:
+    for r in range(w._model.rowCount()):
+        if w._model.comparison_at(r).item.item_id == item_id:
+            w._on_row_changed(w._model.index(r, 0), None)
+            return
+    raise AssertionError(f"表格裡沒有 {item_id}")
+
+
+def test_detail_panel_reports_passive_status(window):
+    w, _, _ctx = window
+    select_item(w, 3153)
+    assert "被動：已建模（命中特效）" in w._detail._label.text()
+    select_item(w, 3031)
+    assert "被動：未建模" in w._detail._label.text()
+
+
+def test_plan_panel_boundary_counts_bound_passives(window):
+    w, _, _ctx = window
+    assert "已計入 22 件裝備被動" in w._plan_panel._boundary.text()
+
+
 def test_version_switch_clears_the_build_bar(window):
     """set_use_cases 換版本後，舊版本的 Item 物件不可留在出裝列。"""
     w, _, _ctx = window

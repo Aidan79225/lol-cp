@@ -3,6 +3,7 @@ import pytest
 from lolcp.application.use_cases.sync_game_data import SyncResult
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import Champion, Item
+from lolcp.domain.item_effects import EffectCategory, PassiveStatus
 from lolcp.domain.pricing import PriceTable
 from lolcp.domain.stats import StatKey, StatLine
 from lolcp.domain.valuation import ItemComparison, LinearValuation
@@ -68,6 +69,24 @@ def test_negative_residual_is_not_called_passive_value():
     text = "\n".join(DetailPanel.render_lines(result))
     assert "被動" not in text
     assert "屬性本身已超值" in text
+
+
+def _passive_text(status: PassiveStatus) -> str:
+    result = evaluate(zhonyas(), StatWeights.uniform(), {StatKey.AP: 20.0, StatKey.ARMOR: 20.0})
+    return "\n".join(DetailPanel.render_lines(result, status))
+
+
+def test_detail_lines_show_a_modelled_passive_with_its_category():
+    assert "被動：已建模（命中特效）" in _passive_text(PassiveStatus(EffectCategory.ON_HIT))
+
+
+def test_detail_lines_show_an_unbound_passive_and_what_is_missing():
+    text = _passive_text(PassiveStatus(EffectCategory.ON_HIT, missing=("data value RangedValue",)))
+    assert "綁定失敗" in text and "RangedValue" in text
+
+
+def test_detail_lines_show_an_unmodelled_passive():
+    assert "被動：未建模" in _passive_text(PassiveStatus(None))
 
 
 def test_detail_panel_accepts_none_without_crashing():
@@ -165,6 +184,24 @@ def test_status_bar_surfaces_diagnostics():
     )
     assert "未知屬性欄位" in widget.text()
     assert "過濾變體" in widget.text()
+
+
+def test_status_bar_surfaces_unbound_passives():
+    diagnostics = Diagnostics()
+    diagnostics.unbound_item_effect(3153, ("data value RangedValue",))
+    widget = StatusBarWidget()
+    widget.update_status(
+        SyncResult(version="16.15.1", offline=False, downloaded=False), diagnostics
+    )
+    assert "被動綁定失敗 1 件" in widget.text()
+
+
+def test_unsupported_formula_parts_alone_keep_the_status_clean():
+    """真實資料本來就有大量不支援的公式組件；沒被效果綁定就無害，
+    顯示出來只會讓狀態列永遠不是「無異常」（spec 2026-09-15 §6 註）。"""
+    diagnostics = Diagnostics()
+    diagnostics.unsupported_formula_part("mStat=13")
+    assert diagnostics.summary_line() == "無異常"
 
 
 def test_zero_residual_is_neither_passive_nor_bargain():

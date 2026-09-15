@@ -113,3 +113,10 @@ def test_context_change_clears_the_previous_plan():
 def test_honest_boundary_note_names_what_is_not_modelled():
     text = panel()._boundary.text()
     assert "被動" in text and "移速" in text and "吸血" in text
+
+
+def test_boundary_note_reports_how_many_passives_are_modelled():
+    p = panel()
+    p.set_modelled_passives(22)
+    assert "已計入 22 件裝備被動" in p._boundary.text()
+    assert "英雄技能" in p._boundary.text()

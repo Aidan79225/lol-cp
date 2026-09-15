@@ -135,4 +135,8 @@ class Diagnostics:
             parts.append(f"在地化缺項 {len(set(self._missing_locale_entries))} 隻")
         if self._unresolved_item_groups:
             parts.append(f"未解析裝備群組 {len(self._unresolved_item_groups)} 個")
+        if self._unbound_item_effects:
+            parts.append(f"被動綁定失敗 {len(self._unbound_item_effects)} 件")
+        # 不支援的公式組件刻意不列入：真實資料本來就大量存在，只有被效果綁定
+        # 時才有害，而那會以「被動綁定失敗」呈現（spec 2026-09-15 §6 註）。
         return "  |  ".join(parts) if parts else "無異常"

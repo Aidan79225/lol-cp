@@ -1,7 +1,7 @@
 # 裝備被動（Item Passives V1）設計
 
 日期：2026-09-15
-狀態：已核准，待實作
+狀態：已實作（2026-09-15）
 前置：`2026-08-17-marginal-model-design.md`（CombatModel）、
 `2026-09-14-build-optimizer-design.md`（§10 後續第 1 項）
 
@@ -207,7 +207,10 @@ Unsupported 也無害 —— 只有綁定時才會停用效果。
   邊際欄與規劃器共用，自動吃到被動
 - 規劃分頁誠實邊界改為：「已計入 N 件裝備被動；未計入：移速、吸血與護盾、群體效果、英雄技能」
 - 詳情面板新增一行：該件的被動是「已建模（類別）」「未建模」或「綁定失敗（缺 X）」
-- 狀態列：`unsupported_formula_parts`、`unbound_item_effects` 計數
+- 狀態列：`unbound_item_effects` 計數
+  （實作時更正：`unsupported_formula_parts` 不列入狀態列。真實資料本來就大量含不支援
+  組件，只有被效果綁定才有害，而那已以「被動綁定失敗」呈現；列入只會讓狀態列
+  永遠不是「無異常」。計數仍保留在 Diagnostics 可查。）
 
 ## 7. 效能
 

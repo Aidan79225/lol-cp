@@ -13,7 +13,7 @@ import pytest
 from lolcp.domain.combat import CombatModel, FightAssumptions, SpellProxy, TargetProfile
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import ChampionBaseStats
-from lolcp.domain.item_effects import EFFECTS, ItemEffectBinder
+from lolcp.domain.item_effects import EFFECTS, EffectCategory, ItemEffectBinder, passive_status
 from lolcp.infrastructure.mapping import ItemMapper
 from lolcp.infrastructure.repositories.file_item_repository import FileItemRepository
 
@@ -96,6 +96,22 @@ def test_missing_data_value_disables_the_effect_and_is_recorded(items):
 def plain_dps(ids, items, target=DUMMY, base=RANGED, level=18):
     """對照組：無效果模型自己產生的 profile（profile 內帶有被動修飾量，不可混用）。"""
     return dps(without_effects(), ids, items, base=base, target=target, level=level)
+
+
+def test_passive_status_distinguishes_modelled_unbound_and_unmodelled(effects):
+    """詳情面板的三種狀態（spec §6）—— 「沒建模」與「綁定失敗」是不同的事。"""
+    unbound = {6672: ("calculation DamageAmount",)}
+    bound = {k: v for k, v in effects.items() if k != 6672}
+
+    botrk = passive_status(3153, bound, unbound)
+    assert botrk.category is EffectCategory.ON_HIT and botrk.modelled
+
+    kraken = passive_status(6672, bound, unbound)
+    assert kraken.category is EffectCategory.ON_HIT and not kraken.modelled
+    assert kraken.missing == ("calculation DamageAmount",)
+
+    ie = passive_status(3031, bound, unbound)
+    assert ie.category is None and not ie.modelled
 
 
 def test_duplicate_items_apply_the_passive_once(effects, items):

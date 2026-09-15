@@ -7,7 +7,7 @@ ItemEffectBinder 在組裝時預檢一次，缺名或公式不支援 → 記入�
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 
@@ -49,6 +49,30 @@ class ItemEffect:
             else:
                 found.extend(formula_problems(calcs[name], dv, calcs))
         return tuple(dict.fromkeys(found))
+
+
+@dataclass(frozen=True)
+class PassiveStatus:
+    """詳情面板的被動狀態：已建模、綁定失敗（已停用）、未建模 —— 三者不可混為一談。"""
+
+    category: EffectCategory | None      # None = 本版本未建模
+    missing: tuple[str, ...] = ()        # 非空 = 有建模但綁定失敗
+
+    @property
+    def modelled(self) -> bool:
+        return self.category is not None and not self.missing
+
+
+def passive_status(
+    item_id: int,
+    bound: Mapping[int, ItemEffect],
+    unbound: Mapping[int, tuple[str, ...]],
+) -> PassiveStatus:
+    if item_id in bound:
+        return PassiveStatus(bound[item_id].category)
+    if item_id in unbound and item_id in EFFECTS:
+        return PassiveStatus(EFFECTS[item_id].category, missing=unbound[item_id])
+    return PassiveStatus(None)
 
 
 class ItemEffectBinder:

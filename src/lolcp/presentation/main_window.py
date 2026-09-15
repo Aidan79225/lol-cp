@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from lolcp.application.use_cases.sync_game_data import SyncResult
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import Champion
+from lolcp.domain.item_effects import passive_status
 from lolcp.presentation.item_table_model import ItemTableModel
 from lolcp.presentation.widgets.detail_panel import DetailPanel
 from lolcp.presentation.widgets.filter_bar import FilterBar
@@ -40,6 +41,7 @@ class MainWindow(QMainWindow):
         self._adjust_weights = bundle.adjust_weights
         self._compute_marginals = bundle.compute_marginals
         self._plan_build = bundle.plan_build
+        self._item_effects = bundle.item_effects
         champions = bundle.champions
         self._sync_result: SyncResult | None = None
         self._all_comparisons: tuple = ()
@@ -83,6 +85,7 @@ class MainWindow(QMainWindow):
         self._plan_panel.set_targets(
             self._plan_build.targets, self._plan_build.settings.beta
         )
+        self._plan_panel.set_modelled_passives(len(self._item_effects))
         self._plan_panel.plan_requested.connect(self._on_plan_requested)
         self._plan_panel.apply_requested.connect(self._on_apply_plan)
         tabs = QTabWidget(self)
@@ -122,6 +125,8 @@ class MainWindow(QMainWindow):
         self._adjust_weights = bundle.adjust_weights
         self._compute_marginals = bundle.compute_marginals
         self._plan_build = bundle.plan_build
+        self._item_effects = bundle.item_effects
+        self._plan_panel.set_modelled_passives(len(self._item_effects))
         self._build_bar.clear()  # 舊版本的 Item 物件不可跨版本沿用
         self._profile.set_champions(bundle.champions)
         # set_champions 期間訊號被擋，profile_changed 不會發 —— 規劃分頁自行重設。
@@ -171,7 +176,15 @@ class MainWindow(QMainWindow):
         self._detail.show_comparison(None)
 
     def _on_row_changed(self, current, _previous) -> None:
-        self._detail.show_comparison(self._model.comparison_at(current.row()))
+        comparison = self._model.comparison_at(current.row())
+        passive = None
+        if comparison is not None:
+            passive = passive_status(
+                comparison.item.item_id,
+                self._item_effects,
+                self._diagnostics.unbound_item_effects,
+            )
+        self._detail.show_comparison(comparison, passive)
 
     def _on_row_double_clicked(self, index) -> None:
         comparison = self._model.comparison_at(index.row())

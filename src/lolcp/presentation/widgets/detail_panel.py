@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from lolcp.domain.item_effects import PassiveStatus
 from lolcp.domain.valuation import ItemComparison, ValuationResult
 
 
@@ -24,11 +25,25 @@ class DetailPanel(QWidget):
         layout.addWidget(self._label)
         layout.addStretch(1)
 
-    def show_comparison(self, comparison: ItemComparison | None) -> None:
+    def show_comparison(
+        self, comparison: ItemComparison | None, passive: PassiveStatus | None = None
+    ) -> None:
         if comparison is None:
             self._label.setText("（選擇一件裝備）")
             return
-        self._label.setText("\n".join(self.render_lines(comparison.canonical)))
+        self._label.setText("\n".join(self.render_lines(comparison.canonical, passive)))
+
+    @staticmethod
+    def passive_line(status: PassiveStatus) -> str:
+        """「沒建模」與「綁定失敗」是不同的事（spec 2026-09-15 §6）。"""
+        if status.category is None:
+            return "被動：未建模（若有被動，ΔDPS 與出裝規劃不計入）"
+        if status.missing:
+            return (
+                f"被動：綁定失敗，已停用（{status.category.value}；"
+                f"缺 {'、'.join(status.missing)}）"
+            )
+        return f"被動：已建模（{status.category.value}）"
 
     @staticmethod
     def _decimal(value: float) -> str:
@@ -38,7 +53,9 @@ class DetailPanel(QWidget):
         return text if "." in text or "e" in text else text + ".0"
 
     @staticmethod
-    def render_lines(result: ValuationResult) -> list[str]:
+    def render_lines(
+        result: ValuationResult, passive: PassiveStatus | None = None
+    ) -> list[str]:
         item = result.item
         lines = [f"{item.name}    {item.total_gold}g", "", "屬性拆解"]
 
@@ -69,4 +86,6 @@ class DetailPanel(QWidget):
         else:
             lines.append("殘差 0g（屬性恰好定價）")
 
+        if passive is not None:
+            lines += ["", DetailPanel.passive_line(passive)]
         return lines

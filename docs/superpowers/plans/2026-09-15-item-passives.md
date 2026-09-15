@@ -26,7 +26,7 @@
 
 **測試：** spec §8 公式計算器清單（fixture 真公式樹）；兩種分段語意；`StatTerm` 的總值／基礎／額外；`CalcRef` 與 `Scaled`；未知組件與未知屬性代碼 → `Unsupported` 且計數；`UnsupportedFormulaError`
 
-- [ ] Step 1 寫失敗測試 → Step 2 確認紅 → Step 3 實作 → Step 4 綠 + 全套件 → Step 5 提交
+- [x] Step 1 寫失敗測試 → Step 2 確認紅 → Step 3 實作 → Step 4 綠 + 全套件 → Step 5 提交
 
 ## Task 2: 資料與設定 —— 攻擊距離、`[fight]`、目標額外生命
 
@@ -34,7 +34,7 @@
 
 **測試：** 達瑞文 attack_range 550、凱爾 175；`[fight]` 缺欄位／未知欄位／型別錯；`energized_attacks` ≥ 1；`average_current_hp_ratio` 在 0..1；targets 缺 `bonus_hp` 大聲失敗
 
-- [ ] 同五步驟
+- [x] 同五步驟
 
 ## Task 3: 效果與傷害模型 V2
 
@@ -42,7 +42,7 @@
 
 **測試：** spec §8 效果清單全數（真裝備 ID 取自 fixture）；綁定失敗停用＋記錄；多件充能相加；彎刀觸發率下限；既有 test_combat 全綠
 
-- [ ] 同五步驟
+- [x] 同五步驟
 
 ## Task 4: 組裝、效能、黃金快照
 
@@ -50,7 +50,7 @@
 
 **內容：** 綁定器接入組裝根；16.16.1 實測規劃器單次 ≤ 1 秒（超過則做 spec §7 的快取）；重新實測黃金快照、記錄新舊序列與原因
 
-- [ ] 同五步驟＋效能實測
+- [x] 同五步驟＋效能實測
 
 ## Task 5: UI 誠實邊界
 
@@ -58,4 +58,4 @@
 
 **內容：** 邊界文字；詳情面板「已建模（類別）／未建模／綁定失敗」；offscreen 截圖目視
 
-- [ ] 同五步驟＋offscreen 截圖
+- [x] 同五步驟＋offscreen 截圖

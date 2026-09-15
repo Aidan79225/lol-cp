@@ -36,6 +36,9 @@ def test_build_use_cases_produces_a_working_pipeline(tmp_path):
     assert ie.canonical.ratio * 100 == pytest.approx(103.6, abs=0.05)
     assert any(c.key == "Draven" for c in champions)
 
+    assert len(bundle.item_effects) == 22
+    assert context.diagnostics.unbound_item_effects == {}
+
     draven = next(c for c in champions if c.key == "Draven")
     plan = bundle.plan_build.execute(draven, "squishy", None, ())
     assert len(plan.steps) == 6

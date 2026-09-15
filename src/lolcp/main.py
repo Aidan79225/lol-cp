@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,7 +18,7 @@ from lolcp.application.use_cases.sync_game_data import SyncGameData
 from lolcp.domain.build_planner import BuildPlanner
 from lolcp.domain.combat import CombatModel
 from lolcp.domain.diagnostics import Diagnostics
-from lolcp.domain.item_effects import ItemEffectBinder
+from lolcp.domain.item_effects import ItemEffect, ItemEffectBinder
 from lolcp.domain.entities import Champion
 from lolcp.domain.pricing import CanonicalDeriver, LeastSquaresDeriver
 from lolcp.domain.valuation import LinearValuation
@@ -51,6 +52,7 @@ class UseCaseBundle:
     adjust_weights: AdjustChampionWeight
     compute_marginals: ComputeMarginals
     plan_build: PlanBuild
+    item_effects: Mapping[int, ItemEffect]   # 已綁定的被動（詳情面板與規劃分頁的誠實邊界）
 
 
 @dataclass
@@ -117,6 +119,7 @@ def build_use_cases(context: AppContext, version: str) -> UseCaseBundle:
         adjust_weights=adjust_weights,
         compute_marginals=compute_marginals,
         plan_build=plan_build,
+        item_effects=effects,
     )
 
 
