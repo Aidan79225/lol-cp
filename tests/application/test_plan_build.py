@@ -10,6 +10,7 @@ from lolcp.domain.build_planner import BuildPlanner, is_boots
 from lolcp.domain.combat import CombatModel
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import Champion
+from lolcp.domain.item_effects import ItemEffectBinder
 from lolcp.infrastructure.mapping import ItemMapper
 from lolcp.infrastructure.repositories.file_champion_repository import (
     FileChampionRepository,
@@ -26,11 +27,14 @@ CONFIG = Path(__file__).parent.parent.parent / "config"
 
 @pytest.fixture(scope="module")
 def use_case():
+    """與組裝根相同：綁定裝備被動 —— 黃金快照必須反映實際 app 的模型。"""
     diagnostics = Diagnostics()
-    proxy, targets, _fight = load_combat_config(CONFIG / "combat_model.toml")
+    proxy, targets, fight = load_combat_config(CONFIG / "combat_model.toml")
+    items = FileItemRepository(FIXTURES, ItemMapper(diagnostics))
+    effects = ItemEffectBinder(diagnostics).bind(items.all_items())
     plan_build = PlanBuild(
-        items=FileItemRepository(FIXTURES, ItemMapper(diagnostics)),
-        planner=BuildPlanner(CombatModel(proxy)),
+        items=items,
+        planner=BuildPlanner(CombatModel(proxy, fight, effects)),
         targets=targets,
         settings=load_planner_config(CONFIG / "build_planner.toml"),
     )
@@ -109,18 +113,24 @@ def test_prefix_ids_are_kept_and_components_reported(use_case):
 
 
 def test_golden_draven_vs_squishy(use_case):
-    """無盡 → 狂戰士護脛 → 幻影之舞 → 狂暴利刃 → 多明尼克 → 嗜血者。"""
+    """海妖 → 狂戰士護脛 → 鬼索 → 臨界點 → 雲陶狂箭 → 無盡（含裝備被動）。"""
     plan_build, champions = use_case
     plan = plan_build.execute(champions.by_key("Draven"), "squishy", None, ())
-    assert [s.item.item_id for s in plan.steps] == [3031, 3006, 3046, 3097, 3036, 3072]
+    assert [s.item.item_id for s in plan.steps] == [6672, 3006, 3124, 3302, 3032, 3031]
 
 
-def test_golden_draven_vs_tank_buys_dominik_earlier(use_case):
-    """打坦克時多明尼克從第 5 件提前到第 3 件 —— 百分比物穿對高護甲值錢
-    （與邊際效益 spec §8 同一條數學），規劃器自己排出了這個順序。"""
+def test_golden_draven_vs_tank_opens_with_botrk(use_case):
+    """打坦克第一件從海妖換成破敗（吃當前生命，坦克 4000 血），臨界點
+    （雙穿 30%）提前到鬼索之前 —— 被動讓目標差異改變了開局件與順序。"""
     plan_build, champions = use_case
     plan = plan_build.execute(champions.by_key("Draven"), "tank", None, ())
-    assert [s.item.item_id for s in plan.steps] == [3031, 3006, 3036, 3046, 3097, 3072]
+    assert [s.item.item_id for s in plan.steps] == [3153, 3006, 3302, 3124, 3032, 3031]
+
+
+def test_fixture_binds_every_passive(use_case):
+    """快照前提：22 件被動全數綁定（缺一件，快照就不是在測設計的模型）。"""
+    plan_build, _ = use_case
+    assert len(plan_build._planner._model.effect_ids) == 22
 
 
 def test_unknown_prefix_ids_are_ignored(use_case):

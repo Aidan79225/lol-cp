@@ -8,6 +8,7 @@ from lolcp.application.use_cases.compute_marginals import ComputeMarginals
 from lolcp.domain.combat import CombatModel
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import Champion
+from lolcp.domain.item_effects import ItemEffectBinder
 from lolcp.infrastructure.mapping import ItemMapper
 from lolcp.infrastructure.repositories.file_champion_repository import (
     FileChampionRepository,
@@ -22,10 +23,12 @@ CONFIG = Path(__file__).parent.parent.parent / "config"
 @pytest.fixture(scope="module")
 def use_case():
     diagnostics = Diagnostics()
-    proxy, targets, _fight = load_combat_config(CONFIG / "combat_model.toml")
+    proxy, targets, fight = load_combat_config(CONFIG / "combat_model.toml")
+    items = FileItemRepository(FIXTURES, ItemMapper(diagnostics))
+    effects = ItemEffectBinder(diagnostics).bind(items.all_items())  # 與組裝根相同
     return ComputeMarginals(
-        items=FileItemRepository(FIXTURES, ItemMapper(diagnostics)),
-        model=CombatModel(proxy),
+        items=items,
+        model=CombatModel(proxy, fight, effects),
         targets=targets,
     ), FileChampionRepository(FIXTURES, diagnostics)
 

@@ -17,6 +17,7 @@ from lolcp.application.use_cases.sync_game_data import SyncGameData
 from lolcp.domain.build_planner import BuildPlanner
 from lolcp.domain.combat import CombatModel
 from lolcp.domain.diagnostics import Diagnostics
+from lolcp.domain.item_effects import ItemEffectBinder
 from lolcp.domain.entities import Champion
 from lolcp.domain.pricing import CanonicalDeriver, LeastSquaresDeriver
 from lolcp.domain.valuation import LinearValuation
@@ -97,8 +98,10 @@ def build_use_cases(context: AppContext, version: str) -> UseCaseBundle:
         valuation=LinearValuation(),
     )
     adjust_weights = AdjustChampionWeight(overrides_store, weight_resolver)
-    proxy, targets, _fight = load_combat_config(context.config_dir / "combat_model.toml")
-    combat_model = CombatModel(proxy)
+    proxy, targets, fight = load_combat_config(context.config_dir / "combat_model.toml")
+    # 被動綁定只做一次；缺名或公式不支援的件記入診斷並停用（spec 2026-09-15 §5）。
+    effects = ItemEffectBinder(diagnostics).bind(items.all_items())
+    combat_model = CombatModel(proxy, fight, effects)
     compute_marginals = ComputeMarginals(
         items=items, model=combat_model, targets=targets
     )
