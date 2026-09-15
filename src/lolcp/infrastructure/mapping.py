@@ -8,8 +8,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from lolcp.domain.diagnostics import Diagnostics
-from lolcp.domain.entities import Item
+from lolcp.domain.entities import GroupLimit, Item
 from lolcp.domain.stats import (
     BIN_FIELD_TO_STAT,
     DDRAGON_FIELD_TO_STAT,
@@ -22,6 +24,7 @@ from lolcp.domain.stats import (
 SUMMONERS_RIFT_MAP_ID = "11"
 MAX_STANDARD_ITEM_ID = 10_000
 _STAT_FIELD_SUFFIX = "Mod"
+ITEM_GROUP_TYPE = "ItemGroup"
 
 
 def looks_like_bin_stat_field(name: str, value: object) -> bool:
@@ -57,11 +60,20 @@ class ItemMapper:
             and int(item_id) < MAX_STANDARD_ITEM_ID
         )
 
-    def to_item(self, item_id: int, raw_dd: dict, raw_bin: dict | None) -> Item:
-        stats = self._map_bin_stats(item_id, raw_bin or {})
+    def to_item(
+        self,
+        item_id: int,
+        raw_dd: dict,
+        raw_bin: dict | None,
+        group_index: Mapping[str, dict] | None = None,
+    ) -> Item:
+        """group_index 為 None 時不解析群組（單件轉換用）；map_all 一律提供。"""
+        raw_bin = raw_bin or {}
+        stats = self._map_bin_stats(item_id, raw_bin)
         self._merge_mana(stats, raw_dd)
         self._check_consistency(item_id, stats, raw_dd)
         gold = raw_dd.get("gold", {})
+        epicness = raw_bin.get("epicness")
         return Item(
             item_id=item_id,
             name=raw_dd["name"],
@@ -71,9 +83,20 @@ class ItemMapper:
             tags=tuple(raw_dd.get("tags", ())),
             icon=raw_dd.get("image", {}).get("full", ""),
             recipe=tuple(int(x) for x in raw_dd.get("from", ())),
+            epicness=epicness if isinstance(epicness, int) and not isinstance(epicness, bool) else None,
+            upgrades=tuple(int(x) for x in raw_dd.get("into", ())),
+            group_limits=(
+                () if group_index is None
+                else self._resolve_group_limits(item_id, raw_bin, group_index)
+            ),
         )
 
     def map_all(self, dd_data: dict[str, dict], bin_data: dict[str, dict]) -> tuple[Item, ...]:
+        group_index = {
+            key: value
+            for key, value in bin_data.items()
+            if isinstance(value, dict) and value.get("__type") == ITEM_GROUP_TYPE
+        }
         items: list[Item] = []
         for item_id, raw_dd in dd_data.items():
             if not self.is_summoners_rift_standard(item_id, raw_dd):
@@ -81,10 +104,30 @@ class ItemMapper:
                     self._diagnostics.filtered_variant(int(item_id))
                 continue
             raw_bin = bin_data.get(f"Items/{item_id}")
-            items.append(self.to_item(int(item_id), raw_dd, raw_bin))
+            items.append(self.to_item(int(item_id), raw_dd, raw_bin, group_index))
         return tuple(sorted(items, key=lambda i: i.item_id))
 
     # ---- 內部 ----
+
+    def _resolve_group_limits(
+        self, item_id: int, raw_bin: dict, group_index: Mapping[str, dict]
+    ) -> tuple[GroupLimit, ...]:
+        """mItemGroups 只存參照；上限在 bin 最外層的 ItemGroup 物件上。
+
+        沒有 mMaxGroupOwnable 的群組（Default 等）不是限制，略過；
+        查不到的參照記入診斷 —— 那代表一條持有上限可能被靜默漏掉。
+        """
+        limits: list[GroupLimit] = []
+        for ref in raw_bin.get("mItemGroups", ()):
+            group = group_index.get(ref)
+            if group is None:
+                self._diagnostics.unresolved_item_group(ref, item_id)
+                continue
+            cap = group.get("mMaxGroupOwnable")
+            if cap is None:
+                continue
+            limits.append(GroupLimit(str(group.get("mItemGroupID", ref)), int(cap)))
+        return tuple(limits)
 
     def _map_bin_stats(self, item_id: int, raw_bin: dict) -> dict[StatKey, float]:
         stats: dict[StatKey, float] = {}

@@ -11,6 +11,14 @@ MANA_PARTYPE = "Mana"
 
 
 @dataclass(frozen=True)
+class GroupLimit:
+    """bin ItemGroup 的持有上限，例如最後耳語系只能擁有 1 件。"""
+
+    group_id: str   # bin mItemGroupID，例如 "LastWhisper"、"Boots"
+    max_owned: int
+
+
+@dataclass(frozen=True)
 class Item:
     """一件裝備。stats 內的 amount 一律已正規化（見 stats.NORMALIZE_X100）。"""
 
@@ -22,6 +30,10 @@ class Item:
     tags: tuple[str, ...]
     icon: str
     recipe: tuple[int, ...]
+    # ---- 出裝規劃器用（spec 2026-09-14 §6.1）；預設值保持既有建構相容 ----
+    epicness: int | None = None               # bin epicness：5 傳說、4 二階鞋與史詩部件
+    upgrades: tuple[int, ...] = ()            # Data Dragon `into`
+    group_limits: tuple[GroupLimit, ...] = () # 只含有上限的群組
 
     def amount_of(self, stat: StatKey) -> float | None:
         """回傳屬性數量；沒有這條屬性回 None。

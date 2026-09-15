@@ -99,6 +99,10 @@ def main() -> None:
         for key, entry in raw.items()
         if key in wanted
     }
+    # 裝備只存群組參照（mItemGroups），持有上限在 bin 最外層的 ItemGroup
+    # 物件上。只留被保留裝備參照到的群組 —— 出裝規劃器的組合限制需要它們。
+    group_refs = {ref for entry in trimmed_bin.values() for ref in entry.get("mItemGroups", ())}
+    trimmed_bin.update({ref: raw[ref] for ref in sorted(group_refs) if ref in raw})
     (OUT / "items_bin.json").write_text(
         json.dumps(trimmed_bin, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
     )

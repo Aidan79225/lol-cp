@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from lolcp.domain.diagnostics import Diagnostics
+from lolcp.domain.entities import GroupLimit
 from lolcp.domain.stats import StatKey
 from lolcp.infrastructure.mapping import ItemMapper, looks_like_bin_stat_field
 
@@ -166,6 +167,46 @@ def test_stat_field_predicate_still_rejects_non_stats():
     assert not looks_like_bin_stat_field("LastMajorChangeMajorPatchVersion", 13)
     assert not looks_like_bin_stat_field("ShopOrderPriority", 2)
     assert not looks_like_bin_stat_field("mCanBeSold", True)
+
+
+def _by_id(items, item_id):
+    return next(i for i in items if i.item_id == item_id)
+
+
+def test_epicness_and_upgrades_are_read(mapper, dd_data, bin_data):
+    """出裝規劃器的候選池判準（spec 2026-09-14 §4.1）的原料。"""
+    items = mapper.map_all(dd_data, bin_data)
+    ie = _by_id(items, 3031)
+    assert ie.epicness == 5
+    assert ie.upgrades == ()
+    assert 3031 in _by_id(items, 1038).upgrades  # 暴風之劍 → 無盡之刃
+
+
+def test_item_group_limits_are_resolved_from_top_level_group_objects(
+    mapper, dd_data, bin_data
+):
+    """mItemGroups 只存參照；上限在 bin 最外層的 ItemGroup 物件上。"""
+    items = mapper.map_all(dd_data, bin_data)
+    assert GroupLimit("LastWhisper", 1) in _by_id(items, 3036).group_limits
+    assert GroupLimit("Boots", 1) in _by_id(items, 3006).group_limits
+
+
+def test_groups_without_an_owned_cap_are_not_limits(mapper, dd_data, bin_data):
+    """Default 群組沒有 mMaxGroupOwnable —— 不是限制，不得出現。"""
+    items = mapper.map_all(dd_data, bin_data)
+    assert all(g.group_id != "Default" for i in items for g in i.group_limits)
+
+
+def test_real_data_has_no_unresolved_group_references(mapper, diagnostics, dd_data, bin_data):
+    mapper.map_all(dd_data, bin_data)
+    assert diagnostics.unresolved_item_groups == {}
+
+
+def test_unresolved_group_reference_is_recorded_not_dropped(mapper, diagnostics, dd_data):
+    raw_bin = {"Items/1036": {"mFlatPhysicalDamageMod": 10.0, "mItemGroups": ["{deadbeef}"]}}
+    items = mapper.map_all({"1036": dd_data["1036"]}, raw_bin)
+    assert items[0].group_limits == ()
+    assert diagnostics.unresolved_item_groups == {"{deadbeef}": 1}
 
 
 def test_bin_mana_agrees_with_ddragon_and_is_kept(mapper, dd_data, bin_data):

@@ -33,8 +33,13 @@ class Diagnostics:
     _unknown_partypes: list[str] = field(default_factory=list)
     _unknown_roles: list[str] = field(default_factory=list)
     _missing_locale_entries: list[str] = field(default_factory=list)
+    _unresolved_item_groups: Counter[str] = field(default_factory=Counter)
 
     # ---- 記錄 ----
+
+    def unresolved_item_group(self, group_ref: str, item_id: int) -> None:
+        """裝備參照的 ItemGroup 不在 bin 最外層 —— 其持有上限無從得知。"""
+        self._unresolved_item_groups[group_ref] += 1
 
     def unknown_bin_field(self, field_name: str, item_id: int) -> None:
         self._unknown_bin_fields[field_name] += 1
@@ -90,6 +95,10 @@ class Diagnostics:
     def missing_locale_entries(self) -> tuple[str, ...]:
         return tuple(self._missing_locale_entries)
 
+    @property
+    def unresolved_item_groups(self) -> dict[str, int]:
+        return dict(self._unresolved_item_groups)
+
     def summary_line(self) -> str:
         parts: list[str] = []
         if self._unknown_bin_fields:
@@ -106,4 +115,6 @@ class Diagnostics:
             parts.append(f"未知角色標籤 {len(set(self._unknown_roles))} 種")
         if self._missing_locale_entries:
             parts.append(f"在地化缺項 {len(set(self._missing_locale_entries))} 隻")
+        if self._unresolved_item_groups:
+            parts.append(f"未解析裝備群組 {len(self._unresolved_item_groups)} 個")
         return "  |  ".join(parts) if parts else "無異常"
