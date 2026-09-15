@@ -15,6 +15,7 @@ from lolcp.domain.formulas import (
     Formula,
     FormulaStat,
     LevelBreakpoints,
+    LevelInterpolation,
     Product,
     RangedScaled,
     Scaled,
@@ -67,6 +68,12 @@ class FormulaMapper:
                 return self._stat_term(raw, DataValue(str(raw.get("mDataValue", ""))))
             case "StatByCoefficientCalculationPart":
                 return self._stat_term(raw, Constant(float(raw.get("mCoefficient", 0.0))))
+            case "StatBySubPartCalculationPart":
+                return self._stat_term(raw, self._part(raw.get("mSubpart")))
+            case "ByCharLevelInterpolationCalculationPart":
+                return LevelInterpolation(
+                    float(raw.get("mStartValue", 0.0)), float(raw.get("mEndValue", 0.0))
+                )
             case "ByCharLevelBreakpointsCalculationPart":
                 return LevelBreakpoints(
                     float(raw.get("mLevel1Value", 0.0)),
@@ -79,6 +86,7 @@ class FormulaMapper:
                         for bp in raw.get("mBreakpoints", ())
                         if isinstance(bp, dict)
                     ),
+                    initial_per_level=float(raw.get("mInitialBonusPerLevel", 0.0)),
                 )
             case "SumOfSubPartsCalculationPart":
                 return Sum(tuple(self._part(p) for p in raw.get("mSubparts", ())))

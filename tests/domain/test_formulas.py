@@ -11,6 +11,7 @@ from lolcp.domain.formulas import (
     FormulaReferenceError,
     FormulaStat,
     LevelBreakpoints,
+    LevelInterpolation,
     Product,
     RangedScaled,
     Scaled,
@@ -122,6 +123,30 @@ def test_problems_lists_missing_names_and_unsupported_parts_through_refs():
         "unsupported BuffCounterByCoefficientCalculationPart",
         "calculation Missing",
     }
+
+
+# ---- 英雄技能所需的擴充（spec champion-kits §5）----
+
+
+def test_level_interpolation_is_linear_from_level_1_to_18():
+    """煞蜜拉被動 AD 係數 3.5% → 10.5%。"""
+    formula = LevelInterpolation(0.035, 0.105)
+    assert evaluate(formula, ctx(level=1)) == pytest.approx(0.035)
+    assert evaluate(formula, ctx(level=18)) == pytest.approx(0.105)
+    assert evaluate(formula, ctx(level=10)) == pytest.approx(0.035 + 0.07 * 9 / 17)
+
+
+def test_initial_bonus_per_level_adds_from_level_2():
+    """煞蜜拉被動 2 + 1/級 → 1 級 2、18 級 19。"""
+    formula = LevelBreakpoints(2.0, (), initial_per_level=1.0)
+    assert evaluate(formula, ctx(level=1)) == 2.0
+    assert evaluate(formula, ctx(level=18)) == 19.0
+
+
+def test_crit_damage_stat_reads_the_total_multiplier():
+    stats = {**STATS, (FormulaStat.CRIT_DAMAGE, StatPart.TOTAL): 2.05}
+    formula = StatTerm(FormulaStat.CRIT_DAMAGE, StatPart.TOTAL, Constant(1.0))
+    assert evaluate(formula, FormulaContext(18, False, {}, {}, stats)) == pytest.approx(2.05)
 
 
 def test_problems_is_empty_for_a_healthy_formula():

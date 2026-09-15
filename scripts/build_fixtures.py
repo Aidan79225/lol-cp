@@ -21,6 +21,15 @@ CDRAGON_VERSION = ".".join(VERSION.split(".")[:2])
 DDRAGON = f"https://ddragon.leagueoflegends.com/cdn/{VERSION}/data"
 CDRAGON = f"https://raw.communitydragon.org/{CDRAGON_VERSION}/game/items.cdtb.bin.json"
 
+# 有技能模型的英雄（spec 2026-09-15 champion kits）。檔案平放在版本目錄，
+# 不用子目錄 —— 整合測試以 iterdir() 逐檔複製 fixture。
+KIT_CHAMPION_KEYS = ("Draven", "Kayle", "Samira")
+CDRAGON_CHAMPION = (
+    f"https://raw.communitydragon.org/{CDRAGON_VERSION}/game/data/characters/{{slug}}/{{slug}}.bin.json"
+)
+# 技能 mapping 只讀這三個欄位；其餘（tooltip、動畫、特效）佔大半體積。
+KEEP_SPELL_FIELDS = ("DataValues", "cooldownTime", "mSpellCalculations")
+
 # 錨定裝備（見 config/anchors.toml）
 ANCHOR_IDS = {1036, 1052, 1028, 1027, 1029, 1033, 1018, 1042, 2022, 1001, 1006}
 # 黃金測試裝備
@@ -107,6 +116,19 @@ def main() -> None:
         json.dumps(trimmed_bin, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
     )
     print(f"  → {len(trimmed_bin)} 個 bin 條目")
+
+    for key in KIT_CHAMPION_KEYS:
+        print(f"英雄技能 bin（{key}）")
+        raw_champion = fetch_json(CDRAGON_CHAMPION.format(slug=key.lower()))
+        trimmed_spells = {
+            path: {"mSpell": {f: entry["mSpell"][f] for f in KEEP_SPELL_FIELDS if f in entry["mSpell"]}}
+            for path, entry in raw_champion.items()
+            if isinstance(entry, dict) and isinstance(entry.get("mSpell"), dict)
+        }
+        (OUT / f"champion_{key}.bin.json").write_text(
+            json.dumps(trimmed_spells, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
+        )
+        print(f"  → {len(trimmed_spells)} 個技能物件")
 
     total = sum(f.stat().st_size for f in OUT.iterdir())
     print(f"\nfixture 總大小: {total / 1024:.0f} KB")

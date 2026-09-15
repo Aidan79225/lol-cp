@@ -18,9 +18,10 @@ from enum import Enum
 class FormulaStat(Enum):
     """bin mStat 代碼。只收有實例佐證的三種（spec §4.2），其餘一律 Unsupported。"""
 
-    AP = 0    # 缺省值：巫妖之禍 LichBaneAPValue、納什之牙 NashorsAPValue
-    AD = 2    # 達瑞文 Q ADScaling
-    HP = 12   # 史特拉克 HealthPercent
+    AP = 0            # 缺省值：巫妖之禍 LichBaneAPValue、納什之牙 NashorsAPValue
+    AD = 2            # 達瑞文 Q ADScaling
+    CRIT_DAMAGE = 9   # 總暴擊傷害倍率（1.75 + 裝備暴傷）：煞蜜拉 R CriticalDamageCalc
+    HP = 12           # 史特拉克 HealthPercent
 
 
 class StatPart(Enum):
@@ -62,6 +63,18 @@ class Breakpoint:
 class LevelBreakpoints:
     level1: float
     breakpoints: tuple[Breakpoint, ...]
+    initial_per_level: float = 0.0   # mInitialBonusPerLevel：2 級起每級加（煞蜜拉被動 2 + 1/級）
+
+
+MAX_CHAMPION_LEVEL = 18
+
+
+@dataclass(frozen=True)
+class LevelInterpolation:
+    """1 級 start 到 18 級 end 線性內插（煞蜜拉被動 AD 係數 3.5% → 10.5%）。"""
+
+    start: float
+    end: float
 
 
 @dataclass(frozen=True)
@@ -102,7 +115,7 @@ class Unsupported:
 
 
 Formula = (
-    Constant | DataValue | StatTerm | LevelBreakpoints | Sum | Product
+    Constant | DataValue | StatTerm | LevelBreakpoints | LevelInterpolation | Sum | Product
     | Scaled | RangedScaled | CalcRef | Unsupported
 )
 
@@ -140,8 +153,10 @@ def evaluate(formula: Formula, ctx: FormulaContext) -> float:
             if key not in ctx.stats:
                 raise FormulaReferenceError(f"屬性 {stat.name}/{part.name} 未提供")
             return ctx.stats[key] * evaluate(coefficient, ctx)
-        case LevelBreakpoints(level1, breakpoints):
-            value = level1
+        case LevelInterpolation(start, end):
+            return start + (end - start) * (ctx.level - 1) / (MAX_CHAMPION_LEVEL - 1)
+        case LevelBreakpoints(level1, breakpoints, initial_per_level):
+            value = level1 + initial_per_level * (ctx.level - 1)
             for bp in breakpoints:
                 if ctx.level >= bp.level:
                     value += bp.additional_at_level
