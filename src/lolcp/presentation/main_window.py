@@ -22,6 +22,7 @@ from lolcp.domain.entities import Champion
 from lolcp.presentation.item_table_model import ItemTableModel
 from lolcp.presentation.widgets.detail_panel import DetailPanel
 from lolcp.presentation.widgets.filter_bar import FilterBar
+from lolcp.presentation.widgets.plan_panel import PlanPanel
 from lolcp.presentation.widgets.profile_selector import ProfileSelector
 from lolcp.presentation.widgets.build_bar import BuildBar
 from lolcp.presentation.widgets.status_bar import StatusBarWidget
@@ -38,6 +39,7 @@ class MainWindow(QMainWindow):
         self._diagnostics = diagnostics
         self._adjust_weights = bundle.adjust_weights
         self._compute_marginals = bundle.compute_marginals
+        self._plan_build = bundle.plan_build
         champions = bundle.champions
         self._sync_result: SyncResult | None = None
         self._all_comparisons: tuple = ()
@@ -77,9 +79,16 @@ class MainWindow(QMainWindow):
         self._detail = DetailPanel(self)
         self._weight_panel = WeightPanel(self)
         self._weight_panel.weight_committed.connect(self._on_weight_committed)
+        self._plan_panel = PlanPanel(self)
+        self._plan_panel.set_targets(
+            self._plan_build.targets, self._plan_build.settings.beta
+        )
+        self._plan_panel.plan_requested.connect(self._on_plan_requested)
+        self._plan_panel.apply_requested.connect(self._on_apply_plan)
         tabs = QTabWidget(self)
         tabs.addTab(self._detail, "詳情")
         tabs.addTab(self._weight_panel, "權重")
+        tabs.addTab(self._plan_panel, "出裝規劃")
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
         splitter.addWidget(self._table)
         splitter.addWidget(tabs)
@@ -112,8 +121,14 @@ class MainWindow(QMainWindow):
         self._list_valuations = bundle.list_valuations
         self._adjust_weights = bundle.adjust_weights
         self._compute_marginals = bundle.compute_marginals
+        self._plan_build = bundle.plan_build
         self._build_bar.clear()  # 舊版本的 Item 物件不可跨版本沿用
         self._profile.set_champions(bundle.champions)
+        # set_champions 期間訊號被擋，profile_changed 不會發 —— 規劃分頁自行重設。
+        self._plan_panel.set_targets(
+            self._plan_build.targets, self._plan_build.settings.beta
+        )
+        self._plan_panel.set_context(None)
 
     def reload(self) -> None:
         champion = self._profile.current_champion()
@@ -131,8 +146,24 @@ class MainWindow(QMainWindow):
 
     # ---- 內部 ----
 
-    def _on_profile_changed(self, _champion) -> None:
+    def _on_profile_changed(self, champion) -> None:
+        # 只在換視角時重設規劃分頁 —— 權重提交也會 reload，但不影響規劃器。
+        self._plan_panel.set_context(champion)
         self.reload()
+
+    def _on_plan_requested(self, target_key: str, beta: float) -> None:
+        plan = self._plan_build.execute(
+            self._profile.current_champion(),
+            target_key,
+            beta,
+            self._build_bar.build_ids,
+        )
+        self._plan_panel.show_plan(plan)
+
+    def _on_apply_plan(self) -> None:
+        plan = self._plan_panel.plan
+        if plan is not None:
+            self._build_bar.set_items([step.item for step in plan.steps])
 
     def _apply_filter(self) -> None:
         visible = [c for c in self._all_comparisons if self._filter.matches(c)]

@@ -50,6 +50,26 @@ def test_clear_resets_and_emits_once():
     assert len(fired) == 1
 
 
+def test_set_items_replaces_the_build_and_emits_once():
+    """套用規劃結果：一次替換，邊際欄只重算一次而非六次。"""
+    bar = BuildBar()
+    bar.add_item(item(1))
+    fired: list[int] = []
+    bar.build_changed.connect(lambda: fired.append(1))
+    bar.set_items([item(2), item(3)])
+    assert bar.build_ids == (2, 3)
+    assert len(bar._buttons) == 2
+    assert len(fired) == 1
+    bar._buttons[0].click()  # 替換後的按鈕仍走真實移除路徑
+    assert bar.build_ids == (3,)
+
+
+def test_set_items_caps_at_six():
+    bar = BuildBar()
+    bar.set_items([item(i) for i in range(8)])
+    assert len(bar.build_ids) == 6
+
+
 def test_level_defaults_to_11_and_emits_on_change():
     bar = BuildBar()
     assert bar.level == 11

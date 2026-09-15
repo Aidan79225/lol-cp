@@ -54,23 +54,36 @@ class BuildBar(QWidget):
         """滿 6 格忽略（遊戲規則），重複加入允許（疊同件是使用者的判斷）。"""
         if len(self._items) >= MAX_SLOTS:
             return
+        self._append(item)
+        self.build_changed.emit()
+
+    def set_items(self, items: Sequence[Item]) -> None:
+        """一次替換整個出裝（套用規劃結果）；只發一次 build_changed，邊際欄只重算一次。"""
+        self._remove_all()
+        for item in list(items)[:MAX_SLOTS]:
+            self._append(item)
+        self.build_changed.emit()
+
+    def clear(self) -> None:
+        if not self._items:
+            return
+        self._remove_all()
+        self.build_changed.emit()
+
+    def _append(self, item: Item) -> None:
         self._items.append(item)
         button = QPushButton(item.name, self)
         button.setToolTip(f"{item.total_gold}g，點擊移除")
         button.clicked.connect(lambda _checked=False, b=button: self._remove(b))
         self._buttons.append(button)
         self._layout.insertWidget(self._slot_start + len(self._buttons) - 1, button)
-        self.build_changed.emit()
 
-    def clear(self) -> None:
-        if not self._items:
-            return
+    def _remove_all(self) -> None:
         for button in self._buttons:
             self._layout.removeWidget(button)
             button.deleteLater()
         self._items.clear()
         self._buttons.clear()
-        self.build_changed.emit()
 
     def _remove(self, button: QPushButton) -> None:
         index = self._buttons.index(button)

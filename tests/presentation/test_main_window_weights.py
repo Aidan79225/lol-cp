@@ -143,6 +143,56 @@ def test_marginal_column_sort_puts_missing_last_in_both_directions(window):
             assert all(v == "—" for v in values[first_dash:])
 
 
+# ---- 出裝規劃分頁（spec 2026-09-14 §7.3） ----
+
+
+def add_to_build(w: MainWindow, item_id: int) -> None:
+    for r in range(w._model.rowCount()):
+        if w._model.comparison_at(r).item.item_id == item_id:
+            w._on_row_double_clicked(w._model.index(r, 0))
+            return
+    raise AssertionError(f"表格裡沒有 {item_id}")
+
+
+def test_plan_panel_is_disabled_in_global_view(window):
+    w, _, _ctx = window
+    assert not w._plan_panel.isEnabled()
+
+
+def test_plan_then_apply_fills_the_build_bar_and_recomputes_marginals(window):
+    w, _, _ctx = window
+    select_champion(w, "達瑞文")
+    assert w._plan_panel.isEnabled()
+    before = marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY)
+
+    w._plan_panel._plan_button.click()
+    plan = w._plan_panel.plan
+    assert plan is not None
+    assert w._plan_panel._table.rowCount() == 6
+
+    w._plan_panel._apply_button.click()
+    assert w._build_bar.build_ids == tuple(s.item.item_id for s in plan.steps)
+    assert marginal_cell(w, 3031, ItemTableModel.COL_DPS_SQUISHY) != before
+
+
+def test_plan_reports_components_in_the_build_bar_as_skipped(window):
+    w, _, _ctx = window
+    select_champion(w, "達瑞文")
+    add_to_build(w, 1018)  # 靈巧披風：部件，不參與規劃
+    w._plan_panel._plan_button.click()
+    assert "靈巧披風" in w._plan_panel._skipped_label.text()
+
+
+def test_switching_champion_clears_the_plan(window):
+    w, _, _ctx = window
+    select_champion(w, "達瑞文")
+    w._plan_panel._plan_button.click()
+    assert w._plan_panel.plan is not None
+    select_champion(w, "全域")
+    assert w._plan_panel.plan is None
+    assert not w._plan_panel.isEnabled()
+
+
 def test_version_switch_clears_the_build_bar(window):
     """set_use_cases 換版本後，舊版本的 Item 物件不可留在出裝列。"""
     w, _, _ctx = window
