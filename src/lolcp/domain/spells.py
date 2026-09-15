@@ -11,6 +11,10 @@ from functools import cached_property
 
 from lolcp.domain.formulas import Formula
 
+# 有技能模型的英雄（Data Dragon en_US key）。同步只下載這些英雄的 bin；
+# champion_kits.KITS 的鍵必須與此一致（有測試守著）。
+KIT_CHAMPION_KEYS: tuple[str, ...] = ("Draven", "Kayle", "Samira")
+
 
 @dataclass(frozen=True)
 class SpellData:

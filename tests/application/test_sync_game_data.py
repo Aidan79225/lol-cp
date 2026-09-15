@@ -5,28 +5,43 @@ from lolcp.application.use_cases.sync_game_data import (
     SyncGameData,
 )
 from lolcp.application.ports import NetworkUnavailableError
+from lolcp.infrastructure.cache.layout import champion_bin_filename
 from lolcp.infrastructure.cache.patch_cache import PatchCache
 
 
 class FakeGateway:
-    def __init__(self, latest="16.16.1", fail_version=False, fail_download=False):
+    def __init__(self, latest="16.16.1", fail_version=False, fail_download=False,
+                 fail_champion_bins=False):
         self._latest = latest
         self._fail_version = fail_version
         self._fail_download = fail_download
+        self._fail_champion_bins = fail_champion_bins
         self.download_calls = 0
+        self.patch_champion_keys: tuple[str, ...] | None = None
+        self.champion_bin_calls: list[tuple[str, tuple[str, ...], object]] = []
 
     def latest_version(self):
         if self._fail_version:
             raise NetworkUnavailableError("offline")
         return self._latest
 
-    def download_patch(self, version, dest, on_progress=None):
+    def download_patch(self, version, dest, on_progress=None, champion_keys=()):
         self.download_calls += 1
+        self.patch_champion_keys = tuple(champion_keys)
         if self._fail_download:
             raise NetworkUnavailableError("truncated")
         (dest / "items_bin.json").write_text("{}", encoding="utf-8")
+        for key in champion_keys:
+            (dest / champion_bin_filename(key)).write_text("{}", encoding="utf-8")
         if on_progress:
             on_progress(100, 100)
+
+    def download_champion_bins(self, version, keys, dest, on_progress=None):
+        self.champion_bin_calls.append((version, tuple(keys), dest))
+        if self._fail_champion_bins:
+            raise NetworkUnavailableError("champion bin")
+        for key in keys:
+            (dest / champion_bin_filename(key)).write_text("{}", encoding="utf-8")
 
 
 def seed(cache: PatchCache, version: str) -> None:
@@ -106,6 +121,57 @@ def test_progress_callback_is_forwarded(tmp_path):
     assert seen == [(100, 100)]
 
 
+# ---- 英雄技能 bin（spec champion-kits §7）----
+
+KEYS = ("Draven", "Kayle", "Samira")
+
+
+def test_full_download_includes_the_kit_champions(tmp_path):
+    cache = PatchCache(tmp_path)
+    gateway = FakeGateway(latest="16.16.1")
+    SyncGameData(gateway, cache, champion_keys=KEYS).execute()
+    assert gateway.patch_champion_keys == KEYS
+    assert cache.missing_champion_bins("16.16.1", KEYS) == ()
+
+
+def test_complete_cache_missing_champion_bins_fetches_only_the_missing(tmp_path):
+    """現有 16.16.1 快取已標記完整但沒有英雄 bin —— 只補缺的，不重抓整包。"""
+    cache = PatchCache(tmp_path)
+    staging = cache.open_staging("16.16.1")
+    (staging / champion_bin_filename("Draven")).write_text("{}", encoding="utf-8")
+    cache.commit("16.16.1", staging)
+    gateway = FakeGateway(latest="16.16.1")
+
+    result = SyncGameData(gateway, cache, champion_keys=KEYS).execute()
+
+    assert gateway.download_calls == 0
+    assert gateway.champion_bin_calls == [("16.16.1", ("Kayle", "Samira"), cache.dir_for("16.16.1"))]
+    assert result == type(result)(version="16.16.1", offline=False, downloaded=True)
+    assert cache.missing_champion_bins("16.16.1", KEYS) == ()
+
+
+def test_complete_cache_with_all_champion_bins_downloads_nothing(tmp_path):
+    cache = PatchCache(tmp_path)
+    staging = cache.open_staging("16.16.1")
+    for key in KEYS:
+        (staging / champion_bin_filename(key)).write_text("{}", encoding="utf-8")
+    cache.commit("16.16.1", staging)
+    gateway = FakeGateway(latest="16.16.1")
+    result = SyncGameData(gateway, cache, champion_keys=KEYS).execute()
+    assert gateway.champion_bin_calls == []
+    assert result.downloaded is False
+
+
+def test_failed_champion_bin_fetch_keeps_the_version_usable(tmp_path):
+    """補抓失敗不影響整體可用 —— 那幾隻英雄退回泛用基準技能（由 repository 留痕）。"""
+    cache = PatchCache(tmp_path)
+    seed(cache, "16.16.1")
+    gateway = FakeGateway(latest="16.16.1", fail_champion_bins=True)
+    result = SyncGameData(gateway, cache, champion_keys=KEYS).execute()
+    assert result == type(result)(version="16.16.1", offline=False, downloaded=False)
+    assert cache.is_complete("16.16.1")
+
+
 def test_use_case_does_not_import_qt():
     """15.8 MB 下載不可阻塞 UI 執行緒，但 use case 本身不該認識 Qt。"""
     import ast
@@ -128,7 +194,8 @@ def test_patch_cache_satisfies_the_cache_store_port():
     from lolcp.application.ports import CacheStore
     from lolcp.infrastructure.cache.patch_cache import PatchCache
 
-    for name in ("is_complete", "latest_complete", "open_staging", "commit", "discard"):
+    for name in ("is_complete", "latest_complete", "open_staging", "commit", "discard",
+                 "dir_for", "missing_champion_bins"):
         assert hasattr(PatchCache, name), f"PatchCache 缺少 {name}"
         port_sig = inspect.signature(getattr(CacheStore, name))
         impl_sig = inspect.signature(getattr(PatchCache, name))

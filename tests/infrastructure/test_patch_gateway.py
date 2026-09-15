@@ -3,6 +3,7 @@ import json
 import pytest
 
 from lolcp.application.ports import NetworkUnavailableError
+from lolcp.infrastructure.cache.layout import champion_bin_filename
 from lolcp.infrastructure.http.patch_gateway import DDRAGON_FILES, HttpPatchGateway
 
 
@@ -78,6 +79,35 @@ def test_download_patch_reports_progress(tmp_path):
         "16.15.1", tmp_path, lambda done, total: seen.append((done, total))
     )
     assert seen
+
+
+# ---- 英雄技能 bin（spec champion-kits §7）----
+
+
+def test_download_patch_includes_requested_champion_bins(tmp_path):
+    fetcher = FakeFetcher()
+    HttpPatchGateway(fetcher).download_patch("16.15.1", tmp_path, None, ("Draven", "Kayle"))
+    assert (tmp_path / champion_bin_filename("Draven")).is_file()
+    assert (tmp_path / champion_bin_filename("Kayle")).is_file()
+    urls = [url for url, _ in fetcher.downloaded]
+    assert "https://raw.communitydragon.org/16.15/game/data/characters/draven/draven.bin.json" in urls
+
+
+def test_champion_bins_use_the_pinned_version_path(tmp_path):
+    fetcher = FakeFetcher()
+    HttpPatchGateway(fetcher).download_champion_bins("16.16.1", ("Samira",), tmp_path, None)
+    (url,) = [u for u, _ in fetcher.downloaded]
+    assert "/16.16/" in url and "/latest/" not in url
+
+
+def test_champion_bin_download_is_atomic_per_file(tmp_path):
+    """下載失敗不可留下截斷的正式檔，也不可留下暫存檔。"""
+    gateway = HttpPatchGateway(FakeFetcher(fail_on={"kayle.bin.json"}))
+    with pytest.raises(NetworkUnavailableError):
+        gateway.download_champion_bins("16.15.1", ("Draven", "Kayle"), tmp_path, None)
+    assert (tmp_path / champion_bin_filename("Draven")).is_file()   # 已成功的保留
+    assert not (tmp_path / champion_bin_filename("Kayle")).exists()
+    assert not any(p.name.endswith(".part") for p in tmp_path.iterdir())
 
 
 def test_download_patch_propagates_failure(tmp_path):

@@ -1,5 +1,6 @@
 import pytest
 
+from lolcp.infrastructure.cache.layout import champion_bin_filename
 from lolcp.infrastructure.cache.patch_cache import PatchCache, parse_version
 
 
@@ -85,6 +86,15 @@ def test_latest_complete_ignores_incomplete_directories(tmp_path):
 
 def test_latest_complete_is_none_when_cache_is_empty(tmp_path):
     assert PatchCache(tmp_path).latest_complete() is None
+
+
+def test_missing_champion_bins_lists_absent_files_in_a_complete_version(tmp_path):
+    """舊快取已標記完整、但沒有英雄 bin → 同步時補抓（spec champion-kits §7）。"""
+    cache = PatchCache(tmp_path)
+    staging = cache.open_staging("16.16.1")
+    (staging / champion_bin_filename("Draven")).write_text("{}", encoding="utf-8")
+    cache.commit("16.16.1", staging)
+    assert cache.missing_champion_bins("16.16.1", ("Draven", "Kayle", "Samira")) == ("Kayle", "Samira")
 
 
 def test_staging_directory_is_not_mistaken_for_a_version(tmp_path):

@@ -12,7 +12,10 @@ from __future__ import annotations
 import os
 import re
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
+
+from lolcp.infrastructure.cache.layout import champion_bin_filename
 
 _STAGING_PREFIX = ".staging-"
 
@@ -83,3 +86,8 @@ class PatchCache:
     def discard(self, staging: Path) -> None:
         if staging.exists():
             shutil.rmtree(staging)
+
+    def missing_champion_bins(self, version: str, keys: Sequence[str]) -> tuple[str, ...]:
+        """完整版本目錄中缺哪些英雄技能 bin（舊快取在技能模型上線前建立）。"""
+        directory = self.dir_for(version)
+        return tuple(k for k in keys if not (directory / champion_bin_filename(k)).is_file())

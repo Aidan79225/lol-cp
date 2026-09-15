@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from lolcp.application.ports import CacheStore, NetworkUnavailableError, PatchGateway
@@ -34,9 +34,16 @@ class SyncResult:
 
 
 class SyncGameData:
-    def __init__(self, gateway: PatchGateway, cache: CacheStore) -> None:
+    def __init__(
+        self,
+        gateway: PatchGateway,
+        cache: CacheStore,
+        champion_keys: Sequence[str] = (),
+    ) -> None:
+        """champion_keys：有技能模型、需要英雄 bin 的英雄（spec champion-kits §7）。"""
         self._gateway = gateway
         self._cache = cache
+        self._champion_keys = tuple(champion_keys)
 
     def execute(self, on_progress: ProgressCallback | None = None) -> SyncResult:
         try:
@@ -45,17 +52,36 @@ class SyncGameData:
             return self._offline_fallback()
 
         if self._cache.is_complete(latest):
-            return SyncResult(version=latest, offline=False, downloaded=False)
+            downloaded = self._fetch_missing_champion_bins(latest, on_progress)
+            return SyncResult(version=latest, offline=False, downloaded=downloaded)
 
         staging = self._cache.open_staging(latest)
         try:
-            self._gateway.download_patch(latest, staging, on_progress)
+            self._gateway.download_patch(latest, staging, on_progress, self._champion_keys)
         except NetworkUnavailableError:
             self._cache.discard(staging)
             return self._offline_fallback()
 
         self._cache.commit(latest, staging)
         return SyncResult(version=latest, offline=False, downloaded=True)
+
+    def _fetch_missing_champion_bins(
+        self, version: str, on_progress: ProgressCallback | None
+    ) -> bool:
+        """舊快取已標記完整但缺英雄 bin → 只補缺的（gateway 逐檔原子寫入）。
+
+        補抓失敗不影響整體可用：缺的英雄退回泛用基準技能，由 repository 記入診斷。
+        """
+        missing = self._cache.missing_champion_bins(version, self._champion_keys)
+        if not missing:
+            return False
+        try:
+            self._gateway.download_champion_bins(
+                version, missing, self._cache.dir_for(version), on_progress
+            )
+        except NetworkUnavailableError:
+            return False
+        return True
 
     def _offline_fallback(self) -> SyncResult:
         local = self._cache.latest_complete()

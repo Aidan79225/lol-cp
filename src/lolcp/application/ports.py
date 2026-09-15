@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Protocol
 
 from lolcp.domain.entities import Champion, Item
+from lolcp.domain.spells import ChampionSpells
 from lolcp.domain.stats import StatKey
 from lolcp.domain.weights import ChampionOverrides
 
@@ -33,12 +34,25 @@ class NetworkUnavailableError(RuntimeError):
     """
 
 
+class ChampionSpellsRepository(Protocol):
+    def spells_for(self, key: str) -> ChampionSpells | None: ...
+
+
 class PatchGateway(Protocol):
     def latest_version(self) -> str: ...
 
     def download_patch(
         self,
         version: str,
+        dest: Path,
+        on_progress: Callable[[int, int], None] | None = None,
+        champion_keys: Sequence[str] = (),
+    ) -> None: ...
+
+    def download_champion_bins(
+        self,
+        version: str,
+        keys: Sequence[str],
         dest: Path,
         on_progress: Callable[[int, int], None] | None = None,
     ) -> None: ...
@@ -54,6 +68,10 @@ class CacheStore(Protocol):
     def commit(self, version: str, staging: Path) -> Path: ...
 
     def discard(self, staging: Path) -> None: ...
+
+    def dir_for(self, version: str) -> Path: ...
+
+    def missing_champion_bins(self, version: str, keys: Sequence[str]) -> tuple[str, ...]: ...
 
 
 class OverridesStore(Protocol):

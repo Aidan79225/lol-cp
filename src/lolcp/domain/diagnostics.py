@@ -36,8 +36,14 @@ class Diagnostics:
     _unresolved_item_groups: Counter[str] = field(default_factory=Counter)
     _unsupported_formula_parts: Counter[str] = field(default_factory=Counter)
     _unbound_item_effects: dict[int, tuple[str, ...]] = field(default_factory=dict)
+    _missing_champion_spells: list[str] = field(default_factory=list)
 
     # ---- 記錄 ----
+
+    def missing_champion_spell(self, champion_key: str) -> None:
+        """有技能模型的英雄缺 bin（補抓失敗或離線）—— 該英雄退回泛用基準技能。"""
+        if champion_key not in self._missing_champion_spells:
+            self._missing_champion_spells.append(champion_key)
 
     def unbound_item_effect(self, item_id: int, reasons: tuple[str, ...]) -> None:
         """裝備被動綁定失敗（缺名稱或公式不支援）—— 該件效果已停用。"""
@@ -117,6 +123,10 @@ class Diagnostics:
     def unbound_item_effects(self) -> dict[int, tuple[str, ...]]:
         return dict(self._unbound_item_effects)
 
+    @property
+    def missing_champion_spells(self) -> tuple[str, ...]:
+        return tuple(self._missing_champion_spells)
+
     def summary_line(self) -> str:
         parts: list[str] = []
         if self._unknown_bin_fields:
@@ -137,6 +147,8 @@ class Diagnostics:
             parts.append(f"未解析裝備群組 {len(self._unresolved_item_groups)} 個")
         if self._unbound_item_effects:
             parts.append(f"被動綁定失敗 {len(self._unbound_item_effects)} 件")
+        if self._missing_champion_spells:
+            parts.append(f"英雄技能資料缺漏 {len(self._missing_champion_spells)} 隻")
         # 不支援的公式組件刻意不列入：真實資料本來就大量存在，只有被效果綁定
         # 時才有害，而那會以「被動綁定失敗」呈現（spec 2026-09-15 §6 註）。
         return "  |  ".join(parts) if parts else "無異常"

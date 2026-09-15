@@ -134,7 +134,9 @@ combo_seconds = 3.0        # 開場打到 S 級評分所需秒數（主觀）
 
 - **下載**：`SyncGameData` 額外下載有技能模型的英雄 bin：
   `raw.communitydragon.org/<major.minor>/game/data/characters/<key>/<key>.bin.json`
-  （16.15、16.16 實測皆 200；**不用 /latest/**）→ 快取 `champion_bins/<key>.bin.json`
+  （16.15、16.16 實測皆 200；**不用 /latest/**）→ 快取 `champion_<Key>.bin.json`，
+  **平放於版本目錄**（實作時更正：原訂 `champion_bins/` 子目錄會打壞以 `iterdir()`
+  逐檔複製 fixture 的整合測試；檔名規則集中於 `infrastructure/cache/layout.py`）
 - **舊快取**：已標記 `.complete` 但缺英雄 bin 的版本目錄（例：現有 16.16.1）→ 下次同步時補下載
   缺的檔案（逐檔原子寫入），不重抓整包
 - **mapping**：`ChampionSpellMapper` 解析 `mSpell.DataValues`（陣列）、`cooldownTime`、

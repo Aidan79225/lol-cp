@@ -19,6 +19,7 @@ from lolcp.domain.build_planner import BuildPlanner
 from lolcp.domain.combat import CombatModel
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.item_effects import ItemEffect, ItemEffectBinder
+from lolcp.domain.spells import KIT_CHAMPION_KEYS
 from lolcp.domain.entities import Champion
 from lolcp.domain.pricing import CanonicalDeriver, LeastSquaresDeriver
 from lolcp.domain.valuation import LinearValuation
@@ -70,7 +71,7 @@ def build_application(
     cache = PatchCache(cache_root)
     gateway = HttpPatchGateway(HttpFetcher(timeout=15.0))
     return AppContext(
-        sync=SyncGameData(gateway, cache),
+        sync=SyncGameData(gateway, cache, champion_keys=KIT_CHAMPION_KEYS),
         diagnostics=diagnostics,
         cache=cache,
         config_dir=config_dir,
