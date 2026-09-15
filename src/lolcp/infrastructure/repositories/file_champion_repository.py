@@ -102,6 +102,7 @@ class FileChampionRepository:
                 armor_growth=float(raw["armorperlevel"]),
                 magic_resist=float(raw["spellblock"]),
                 magic_resist_growth=float(raw["spellblockperlevel"]),
+                attack_range=float(raw["attackrange"]),
             )
         except (KeyError, TypeError, ValueError):
             return None

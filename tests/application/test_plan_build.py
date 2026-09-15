@@ -27,7 +27,7 @@ CONFIG = Path(__file__).parent.parent.parent / "config"
 @pytest.fixture(scope="module")
 def use_case():
     diagnostics = Diagnostics()
-    proxy, targets = load_combat_config(CONFIG / "combat_model.toml")
+    proxy, targets, _fight = load_combat_config(CONFIG / "combat_model.toml")
     plan_build = PlanBuild(
         items=FileItemRepository(FIXTURES, ItemMapper(diagnostics)),
         planner=BuildPlanner(CombatModel(proxy)),

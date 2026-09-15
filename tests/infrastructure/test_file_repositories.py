@@ -138,6 +138,15 @@ def test_champion_base_stats_are_parsed_from_en_us(diagnostics):
     assert base.attack_speed_growth == 2.7
     assert base.hp == 675.0
     assert base.armor == 29.0
+    assert base.attack_range == 550.0
+    assert base.is_ranged
+
+
+def test_kayle_base_attack_range_is_melee(diagnostics):
+    """凱爾 175：6 級起靠被動變遠程，但技能不在模型內 —— 以近戰計（spec 2026-09-15 §3.2）。"""
+    kayle = FileChampionRepository(FIXTURES, diagnostics).by_key("Kayle")
+    assert kayle.base_stats.attack_range == 175.0
+    assert not kayle.base_stats.is_ranged
 
 
 def test_missing_stats_block_yields_none_not_crash(tmp_path, diagnostics):

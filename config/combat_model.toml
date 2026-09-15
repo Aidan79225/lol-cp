@@ -1,6 +1,7 @@
-# 邊際效益模型的常數（spec 2026-08-17 §5）。
+# 戰鬥模型的常數（spec 2026-08-17 §5、2026-09-15 §3.3–§3.4）。
 # spell_proxy 三個常數是主觀擇定的基準技能 —— 可爭論、可修改。
 # targets 是取代「操作假設」的標準假想目標。
+# fight 是裝備被動的整場平均假設。
 
 [spell_proxy]
 base_damage = 300.0
@@ -12,9 +13,18 @@ name = "脆皮"
 armor = 60.0
 magic_resist = 50.0
 hp = 1800.0
+bonus_hp = 300.0     # 多明尼克吃額外生命：15% × min(1, 額外生命 ÷ 1500)
 
 [targets.tank]
 name = "坦克"
 armor = 200.0
 magic_resist = 120.0
 hp = 4000.0
+bonus_hp = 2000.0
+
+[fight]
+# 整場戰鬥中目標平均剩餘生命比例（從滿血打到 0 的線性平均）。
+# 破敗、電流旋風劍吃當前生命；海妖吃已損失生命 = 1 − 此值。
+average_current_hp_ratio = 0.5
+# 充能普攻每幾下普攻觸發一次（移動＋普攻共同充能，主觀擇定）。
+energized_attacks = 4

@@ -97,7 +97,7 @@ def build_use_cases(context: AppContext, version: str) -> UseCaseBundle:
         valuation=LinearValuation(),
     )
     adjust_weights = AdjustChampionWeight(overrides_store, weight_resolver)
-    proxy, targets = load_combat_config(context.config_dir / "combat_model.toml")
+    proxy, targets, _fight = load_combat_config(context.config_dir / "combat_model.toml")
     combat_model = CombatModel(proxy)
     compute_marginals = ComputeMarginals(
         items=items, model=combat_model, targets=targets

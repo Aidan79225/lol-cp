@@ -6,7 +6,7 @@ import tomllib
 from pathlib import Path
 
 from lolcp.domain.build_planner import MAX_SLOTS, PlannerSettings
-from lolcp.domain.combat import SpellProxy, TargetProfile
+from lolcp.domain.combat import FightAssumptions, SpellProxy, TargetProfile
 from lolcp.domain.pricing import AnchorConfig, AnchorEntry
 from lolcp.domain.stats import StatKey
 from lolcp.domain.weights import ChampionOverrides, RoleDefaults, StatWeights
@@ -78,11 +78,17 @@ def load_champion_overrides(directory: Path) -> ChampionOverrides:
     return ChampionOverrides(by_champion)
 
 
-def load_combat_config(path: Path) -> tuple[SpellProxy, tuple[TargetProfile, ...]]:
-    """讀取邊際效益模型常數。缺區塊、缺欄位都要大聲失敗。"""
+_TARGET_FIELDS = {"name", "armor", "magic_resist", "hp", "bonus_hp"}
+_FIGHT_FIELDS = {"average_current_hp_ratio", "energized_attacks"}
+
+
+def load_combat_config(
+    path: Path,
+) -> tuple[SpellProxy, tuple[TargetProfile, ...], FightAssumptions]:
+    """讀取戰鬥模型常數。缺區塊、缺欄位、未知鍵、範圍錯誤都要大聲失敗。"""
     raw = _read_toml(path)
     for section in raw:
-        if section not in ("spell_proxy", "targets"):
+        if section not in ("spell_proxy", "targets", "fight"):
             raise ConfigError(f"{path.name} 出現未知區塊 {section!r}")
     proxy_raw = raw.get("spell_proxy")
     if not isinstance(proxy_raw, dict):
@@ -103,7 +109,7 @@ def load_combat_config(path: Path) -> tuple[SpellProxy, tuple[TargetProfile, ...
     for key, body in targets_raw.items():
         if not isinstance(body, dict):
             raise ConfigError(f"targets.{key} 的內容必須是表格")
-        unknown = set(body) - {"name", "armor", "magic_resist", "hp"}
+        unknown = set(body) - _TARGET_FIELDS
         if unknown:
             raise ConfigError(f"targets.{key} 出現未知欄位 {sorted(unknown)}")
         if "name" not in body:
@@ -115,9 +121,27 @@ def load_combat_config(path: Path) -> tuple[SpellProxy, tuple[TargetProfile, ...
                 armor=_required_number(body, "armor", f"targets.{key}"),
                 magic_resist=_required_number(body, "magic_resist", f"targets.{key}"),
                 hp=_required_number(body, "hp", f"targets.{key}"),
+                bonus_hp=_required_number(body, "bonus_hp", f"targets.{key}"),
             )
         )
-    return proxy, tuple(targets)
+    return proxy, tuple(targets), _parse_fight(raw.get("fight"), path)
+
+
+def _parse_fight(body: object, path: Path) -> FightAssumptions:
+    if not isinstance(body, dict):
+        raise ConfigError(f"{path.name} 缺少 [fight] 區塊")
+    unknown = set(body) - _FIGHT_FIELDS
+    if unknown:
+        raise ConfigError(f"fight 出現未知欄位 {sorted(unknown)}")
+    ratio = _required_number(body, "average_current_hp_ratio", "fight")
+    if not 0.0 <= ratio <= 1.0:
+        raise ConfigError(f"fight.average_current_hp_ratio 必須在 0～1，得到 {ratio}")
+    if "energized_attacks" not in body:
+        raise ConfigError("fight 缺少欄位 energized_attacks")
+    energized = _required_int(body, "energized_attacks")
+    if energized < 1:
+        raise ConfigError(f"fight.energized_attacks 必須 ≥ 1，得到 {energized}")
+    return FightAssumptions(average_current_hp_ratio=ratio, energized_attacks=energized)
 
 
 _PLANNER_KEYS = ("levels", "final_holding_gold", "beta", "boots_slot", "beam_width")
