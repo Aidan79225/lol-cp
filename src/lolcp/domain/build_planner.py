@@ -55,6 +55,9 @@ class PlannerSettings:
     beta: float
     boots_slot: int              # 1..6；0 = 不出鞋
     beam_width: int
+    # 接近的替代選項（spec 2026-09-16 near-tie）：分數差距在容忍範圍內者列出
+    alternative_tolerance: float = 0.0
+    max_alternatives: int = 0
 
     def __post_init__(self) -> None:
         if len(self.levels) != MAX_SLOTS:
@@ -63,6 +66,20 @@ class PlannerSettings:
             raise ValueError(f"boots_slot 必須在 0..{MAX_SLOTS}，得到 {self.boots_slot}")
         if self.beam_width < 1:
             raise ValueError(f"beam_width 必須 ≥ 1，得到 {self.beam_width}")
+        if not 0.0 <= self.alternative_tolerance <= 1.0:
+            raise ValueError(
+                f"alternative_tolerance 必須在 0～1，得到 {self.alternative_tolerance}"
+            )
+        if self.max_alternatives < 0:
+            raise ValueError(f"max_alternatives 必須 ≥ 0，得到 {self.max_alternatives}")
+
+
+@dataclass(frozen=True)
+class PlanAlternative:
+    """同一步的其他合法候選，分數差距在容忍範圍內（spec 2026-09-16 near-tie）。"""
+
+    item: Item
+    score_ratio: float   # 0.993 = 比選中的低 0.7%
 
 
 @dataclass(frozen=True)
@@ -72,6 +89,7 @@ class PlanStep:
     dps: float
     ehp: float
     score: float
+    alternatives: tuple[PlanAlternative, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -136,10 +154,50 @@ class BuildPlanner:
 
         sequence, value = best
         steps = tuple(
-            PlanStep(sequence[k], settings.levels[k], *evaluator.score(sequence[: k + 1]))
+            PlanStep(
+                sequence[k],
+                settings.levels[k],
+                *evaluator.score(sequence[: k + 1]),
+                alternatives=self._alternatives(
+                    evaluator, rules, candidates, sequence[:k], sequence[k], settings
+                ),
+            )
             for k in range(len(sequence))
         )
         return BuildPlan(steps=steps, value=value, skipped=skipped)
+
+    def _alternatives(
+        self,
+        evaluator: _Evaluator,
+        rules: _Rules,
+        candidates: tuple[Item, ...],
+        prefix: tuple[Item, ...],
+        chosen: Item,
+        settings: PlannerSettings,
+    ) -> tuple[PlanAlternative, ...]:
+        """這一步分數與選中件相差在容忍範圍內的其他合法候選。
+
+        合法性以「這個位置的前綴」判定（群組上限、鞋位、不重複）—— 替代是
+        「改買這件」，所以不把選中件算進限制。分數沿用評分快取，成本可忽略。
+        """
+        if settings.max_alternatives <= 0:
+            return ()
+        chosen_score = evaluator.score((*prefix, chosen))[2]
+        if chosen_score <= 0:
+            return ()
+        floor = (1 - settings.alternative_tolerance) * chosen_score
+        scored: list[tuple[float, Item]] = []
+        for candidate in candidates:
+            if candidate.item_id == chosen.item_id or not rules.legal(prefix, candidate):
+                continue
+            score = evaluator.score((*prefix, candidate))[2]
+            if score >= floor:
+                scored.append((score / chosen_score, candidate))
+        scored.sort(key=lambda pair: (-pair[0], pair[1].item_id))
+        return tuple(
+            PlanAlternative(item=item, score_ratio=ratio)
+            for ratio, item in scored[: settings.max_alternatives]
+        )
 
     # ---- 第 1 階段：選組合 ----
 

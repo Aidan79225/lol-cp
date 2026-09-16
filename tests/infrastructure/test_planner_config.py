@@ -15,6 +15,8 @@ VALID = (
     "beta = 0.25\n"
     "boots_slot = 2\n"
     "beam_width = 40\n"
+    "alternative_tolerance = 0.03\n"
+    "max_alternatives = 3\n"
 )
 
 
@@ -31,6 +33,22 @@ def test_loads_real_config():
     assert settings.beta == 0.25
     assert settings.boots_slot == 2
     assert settings.beam_width == 40
+    assert settings.alternative_tolerance == 0.03
+    assert settings.max_alternatives == 3
+
+
+def test_alternative_tolerance_must_be_within_zero_and_one(tmp_path):
+    for bad in ("-0.1", "1.5"):
+        text = VALID.replace("alternative_tolerance = 0.03", f"alternative_tolerance = {bad}")
+        with pytest.raises(ConfigError, match="alternative_tolerance"):
+            load_planner_config(write(tmp_path, text))
+
+
+def test_max_alternatives_must_be_a_non_negative_integer(tmp_path):
+    for bad in ("-1", "2.5", "true"):
+        text = VALID.replace("max_alternatives = 3", f"max_alternatives = {bad}")
+        with pytest.raises(ConfigError, match="max_alternatives"):
+            load_planner_config(write(tmp_path, text))
 
 
 def test_unknown_key_is_rejected(tmp_path):

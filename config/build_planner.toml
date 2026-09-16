@@ -17,3 +17,9 @@ boots_slot = 2
 
 # beam search 保留的組合數。集合數 ≤ 此值時結果為全域最佳。
 beam_width = 40
+
+# 接近的替代選項（spec 2026-09-16 near-tie）：每一步列出分數差距在此比例內的
+# 其他合法候選。實測「第一件」常由 1% 以內的差距決定，遠小於模型誤差 ——
+# 列出替代是為了不把這種差距呈現成確定答案。0 = 不顯示。
+alternative_tolerance = 0.03
+max_alternatives = 3

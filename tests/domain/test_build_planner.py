@@ -34,11 +34,13 @@ def planner() -> BuildPlanner:
     return BuildPlanner(CombatModel(SpellProxy(base_damage=0.0, ap_ratio=0.0, base_cooldown=8.0)))
 
 
-def settings(beta=0.0, boots_slot=0, beam_width=8, final=3000.0) -> PlannerSettings:
+def settings(beta=0.0, boots_slot=0, beam_width=8, final=3000.0,
+             alternative_tolerance=0.03, max_alternatives=3) -> PlannerSettings:
     # 窄 beam：玩具池多為同質件；boots_slot=0 時第 2 階段每集合窮舉 720 種排列
     return PlannerSettings(
         levels=LEVELS, final_holding_gold=final, beta=beta,
         boots_slot=boots_slot, beam_width=beam_width,
+        alternative_tolerance=alternative_tolerance, max_alternatives=max_alternatives,
     )
 
 
@@ -239,6 +241,64 @@ def test_search_matches_brute_force_on_a_small_pool():
     assert plan.value == pytest.approx(
         planner().sequence_value(TOY_BASE, DUMMY, tuple(st.item for st in plan.steps), s)
     )
+
+
+# ---- 接近的替代選項（spec 2026-09-16 near-tie §3、§6）----
+#
+# β=0、雙抗 0、基礎 AD 100、攻速 1.0 → 第 1 步分數 = 100 + 該件 AD。
+# AD 100／98／96／94／90 對應比例 1.00／0.99／0.98／0.97／0.95。
+
+def tie_pool():
+    strong = [item(i, 3000, ad(amount)) for i, amount in
+              ((1, 100.0), (2, 98.0), (3, 96.0), (4, 94.0), (5, 90.0))]
+    filler = [item(i, 3000, ad(10.0)) for i in range(6, 10)]
+    return strong + filler
+
+
+def alt_ids(step):
+    return [a.item.item_id for a in step.alternatives]
+
+
+def test_alternatives_are_within_the_tolerance_and_sorted():
+    plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [], settings())
+    first = plan.steps[0]
+    assert first.item.item_id == 1
+    assert alt_ids(first) == [2, 3, 4]          # 0.99／0.98／0.97 入列，0.95 不入列
+    assert [round(a.score_ratio, 4) for a in first.alternatives] == [0.99, 0.98, 0.97]
+
+
+def test_tighter_tolerance_drops_the_further_ones():
+    plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [], settings(alternative_tolerance=0.02))
+    assert alt_ids(plan.steps[0]) == [2, 3]
+
+
+def test_alternatives_are_capped():
+    plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [], settings(max_alternatives=1))
+    assert alt_ids(plan.steps[0]) == [2]
+
+
+def test_alternatives_never_include_the_chosen_item():
+    plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [], settings())
+    for step in plan.steps:
+        assert step.item.item_id not in alt_ids(step)
+
+
+def test_alternatives_respect_group_caps_from_the_prefix():
+    """前綴已有同群組的件 → 另一件不可列為替代（買了也吃不到）。"""
+    whisper = (GroupLimit("LastWhisper", 1),)
+    chosen = item(1, 3000, ad(100.0), groups=whisper)
+    sibling = item(2, 3000, ad(99.0), groups=whisper)
+    pool = [chosen, sibling] + [item(i, 3000, ad(98.0)) for i in range(3, 10)]
+    plan = planner().plan(TOY_BASE, DUMMY, pool, [chosen], settings())
+    assert plan.steps[0].item.item_id == 1
+    assert 2 not in alt_ids(plan.steps[1])
+
+
+def test_alternatives_respect_the_boots_slot():
+    pool = [item(i, 3000, ad(50.0)) for i in range(1, 8)] + [boots(20), boots(21)]
+    plan = planner().plan(TOY_BASE, DUMMY, pool, [], settings(boots_slot=2))
+    assert all(is_boots(a.item) for a in plan.steps[1].alternatives)      # 鞋位只列鞋
+    assert not any(is_boots(a.item) for a in plan.steps[2].alternatives)  # 其餘位置不列鞋
 
 
 def test_plan_is_deterministic():

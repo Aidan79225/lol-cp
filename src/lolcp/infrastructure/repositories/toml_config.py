@@ -183,7 +183,10 @@ def load_kit_configs(directory: Path) -> dict[str, KitSettings]:
     return {key: load_kit_config(directory / f"{key}.toml", key) for key in KIT_ASSUMPTIONS}
 
 
-_PLANNER_KEYS = ("levels", "final_holding_gold", "beta", "boots_slot", "beam_width")
+_PLANNER_KEYS = (
+    "levels", "final_holding_gold", "beta", "boots_slot", "beam_width",
+    "alternative_tolerance", "max_alternatives",
+)
 _MIN_LEVEL, _MAX_LEVEL = 1, 18
 
 
@@ -215,12 +218,20 @@ def load_planner_config(path: Path) -> PlannerSettings:
     beam_width = _required_int(raw, "beam_width")
     if beam_width < 1:
         raise ConfigError(f"beam_width 必須 ≥ 1，得到 {beam_width}")
+    tolerance = _required_number(raw, "alternative_tolerance", path.name)
+    if not 0.0 <= tolerance <= 1.0:
+        raise ConfigError(f"alternative_tolerance 必須在 0～1，得到 {tolerance}")
+    max_alternatives = _required_int(raw, "max_alternatives")
+    if max_alternatives < 0:
+        raise ConfigError(f"max_alternatives 必須 ≥ 0，得到 {max_alternatives}")
     return PlannerSettings(
         levels=tuple(levels),
         final_holding_gold=_required_number(raw, "final_holding_gold", path.name),
         beta=beta,
         boots_slot=boots_slot,
         beam_width=beam_width,
+        alternative_tolerance=tolerance,
+        max_alternatives=max_alternatives,
     )
 
 
