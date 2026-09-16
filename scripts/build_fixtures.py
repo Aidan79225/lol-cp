@@ -29,6 +29,7 @@ CDRAGON_CHAMPION = (
 )
 # 技能 mapping 只讀這三個欄位；其餘（tooltip、動畫、特效）佔大半體積。
 KEEP_SPELL_FIELDS = ("DataValues", "cooldownTime", "mSpellCalculations")
+KEEP_RECORD_FIELDS = ("__type", "attackSpeedRatioModifiable", "attackSpeedModifiable")
 
 # 錨定裝備（見 config/anchors.toml）
 ANCHOR_IDS = {1036, 1052, 1028, 1027, 1029, 1033, 1018, 1042, 2022, 1001, 1006}
@@ -125,6 +126,12 @@ def main() -> None:
             for path, entry in raw_champion.items()
             if isinstance(entry, dict) and isinstance(entry.get("mSpell"), dict)
         }
+        # CharacterRecord 帶攻速係數（凱爾 0.667 ≠ 基礎攻速 0.625）—— 裝備攻速加成乘的是它。
+        trimmed_spells.update({
+            path: {f: entry[f] for f in KEEP_RECORD_FIELDS if f in entry}
+            for path, entry in raw_champion.items()
+            if isinstance(entry, dict) and entry.get("__type") == "CharacterRecord"
+        })
         (OUT / f"champion_{key}.bin.json").write_text(
             json.dumps(trimmed_spells, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
         )
