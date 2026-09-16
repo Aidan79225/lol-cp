@@ -10,6 +10,7 @@ from lolcp.domain.build_planner import BuildPlanner, is_boots
 from lolcp.domain.combat import CombatModel
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import Champion
+from lolcp.domain.build_planner import AlternativeTier
 from lolcp.domain.champion_kits import ChampionKitBinder
 from lolcp.domain.item_effects import ItemEffectBinder
 from lolcp.infrastructure.champion_spell_mapper import ChampionSpellMapper
@@ -153,6 +154,41 @@ def test_golden_samira_vs_squishy(use_case):
 
     R 十發每發可暴擊、Q 吃半額暴傷 —— 無盡提前到第 3 件。"""
     assert plan_ids(use_case, "Samira", "squishy") == [3032, 3006, 3031, 6676, 3036, 2520]
+
+
+# ---- 替代選項（spec 2026-09-16 near-tie）----
+
+
+def step_alternatives(use_case, key, target, index):
+    plan_build, champions = use_case
+    plan = plan_build.execute(champions.by_key(key), target, None, ())
+    return plan.steps[index].alternatives
+
+
+def test_first_item_has_no_near_tie_alternative(use_case):
+    """回答「第一名只贏 0.7%」的疑慮：那是單步視角的錯覺。
+
+    以規劃器真正最佳化的序列價值衡量，換掉第一件要付 6% 以上的代價 ——
+    第 1 步不該出現「接近」級替代（spec near-tie §3.1）。"""
+    for key in ("Draven", "Samira", "Kayle"):
+        tiers = {a.tier for a in step_alternatives(use_case, key, "squishy", 0)}
+        assert AlternativeTier.NEAR not in tiers, key
+
+
+def test_later_steps_surface_genuinely_close_choices(use_case):
+    """真正接近的選擇集中在後段 —— 達瑞文第 4 步的海妖殺手（實測 −1.5%）。"""
+    alternatives = step_alternatives(use_case, "Draven", "squishy", 3)
+    kraken = next(a for a in alternatives if a.item.item_id == 6672)
+    assert kraken.tier is AlternativeTier.NEAR
+    assert 0.95 < kraken.score_ratio < 1.0
+
+
+def test_alternatives_never_repeat_an_item_already_in_the_plan(use_case):
+    plan_build, champions = use_case
+    plan = plan_build.execute(champions.by_key("Samira"), "squishy", None, ())
+    chosen = {s.item.item_id for s in plan.steps}
+    for step in plan.steps:
+        assert not chosen & {a.item.item_id for a in step.alternatives}
 
 
 def test_fixture_binds_every_kit(use_case):

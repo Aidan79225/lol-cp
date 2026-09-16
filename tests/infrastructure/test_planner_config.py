@@ -15,7 +15,8 @@ VALID = (
     "beta = 0.25\n"
     "boots_slot = 2\n"
     "beam_width = 40\n"
-    "alternative_tolerance = 0.03\n"
+    "near_tolerance = 0.03\n"
+    "consider_tolerance = 0.08\n"
     "max_alternatives = 3\n"
 )
 
@@ -33,15 +34,24 @@ def test_loads_real_config():
     assert settings.beta == 0.25
     assert settings.boots_slot == 2
     assert settings.beam_width == 40
-    assert settings.alternative_tolerance == 0.03
+    assert settings.near_tolerance == 0.03
+    assert settings.consider_tolerance == 0.08
     assert settings.max_alternatives == 3
 
 
-def test_alternative_tolerance_must_be_within_zero_and_one(tmp_path):
-    for bad in ("-0.1", "1.5"):
-        text = VALID.replace("alternative_tolerance = 0.03", f"alternative_tolerance = {bad}")
-        with pytest.raises(ConfigError, match="alternative_tolerance"):
-            load_planner_config(write(tmp_path, text))
+def test_tolerances_must_be_within_zero_and_one(tmp_path):
+    for key, good in (("near_tolerance", "0.03"), ("consider_tolerance", "0.08")):
+        for bad in ("-0.1", "1.5"):
+            text = VALID.replace(f"{key} = {good}", f"{key} = {bad}")
+            with pytest.raises(ConfigError, match=key):
+                load_planner_config(write(tmp_path, text))
+
+
+def test_consider_tolerance_must_not_be_tighter_than_near(tmp_path):
+    """「可考慮」是較寬的一級 —— 反過來設代表設定檔寫錯了。"""
+    text = VALID.replace("consider_tolerance = 0.08", "consider_tolerance = 0.01")
+    with pytest.raises(ConfigError, match="consider_tolerance"):
+        load_planner_config(write(tmp_path, text))
 
 
 def test_max_alternatives_must_be_a_non_negative_integer(tmp_path):

@@ -1,6 +1,6 @@
 import pytest
 
-from lolcp.domain.build_planner import BuildPlan, PlanStep
+from lolcp.domain.build_planner import AlternativeTier, BuildPlan, PlanAlternative, PlanStep
 from lolcp.domain.combat import TargetProfile
 from lolcp.domain.entities import Champion, ChampionBaseStats, Item
 from lolcp.presentation.widgets.plan_panel import PlanPanel
@@ -30,7 +30,11 @@ def item(item_id: int, name: str) -> Item:
 def sample_plan() -> BuildPlan:
     return BuildPlan(
         steps=(
-            PlanStep(item(3031, "無盡之刃"), 9, 300.0, 2500.0, 310.5),
+            PlanStep(item(3031, "無盡之刃"), 9, 300.0, 2500.0, 310.5,
+                     alternatives=(
+                         PlanAlternative(item(6672, "海妖殺手"), 0.996, AlternativeTier.NEAR),
+                         PlanAlternative(item(3032, "雲陶狂箭"), 0.925, AlternativeTier.CONSIDER),
+                     )),
             PlanStep(item(3006, "狂戰士護脛"), 11, 400.0, 2800.0, 412.25),
         ),
         value=1.0,
@@ -88,6 +92,33 @@ def test_show_plan_fills_rows_reports_skipped_and_enables_apply():
     p.apply_requested.connect(lambda: fired.append(1))
     p._apply_button.click()
     assert fired == [1]
+
+
+def test_alternatives_column_lists_near_ties_with_their_gap():
+    """第一名常只贏 1% 以內 —— 把接近的選擇攤出來（spec 2026-09-16 near-tie §5）。"""
+    p = panel()
+    p.set_context(DRAVEN)
+    p.show_plan(sample_plan())
+    text = p._table.item(0, PlanPanel.COL_ALTERNATIVES).text()
+    assert "海妖殺手 -0.4%（接近）" in text
+    assert "雲陶狂箭 -7.5%（可考慮）" in text
+
+
+def test_alternatives_cell_keeps_the_full_text_in_a_tooltip():
+    """替代欄內容比欄寬長，表格會截斷 —— 滑鼠停留必須看得到全文。"""
+    p = panel()
+    p.set_context(DRAVEN)
+    p.show_plan(sample_plan())
+    cell = p._table.item(0, PlanPanel.COL_ALTERNATIVES)
+    assert cell.toolTip() == cell.text()
+    assert "（可考慮）" in cell.toolTip()
+
+
+def test_step_without_alternatives_shows_a_dash():
+    p = panel()
+    p.set_context(DRAVEN)
+    p.show_plan(sample_plan())
+    assert p._table.item(1, PlanPanel.COL_ALTERNATIVES).text() == "—"
 
 
 def test_show_none_clears_everything():

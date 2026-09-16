@@ -23,20 +23,32 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from lolcp.domain.build_planner import BuildPlan
+from lolcp.domain.build_planner import BuildPlan, PlanStep
 from lolcp.domain.combat import TargetProfile
 from lolcp.domain.entities import Champion
 
 # 誠實邊界：已建模的被動件數由組裝根告知、技能狀態依視角英雄而定；其餘規劃器看不見。
 BOUNDARY_TEMPLATE = "已計入 {count} 件裝備被動；{skills}；未計入：移速、吸血與護盾、群體效果"
 GENERIC_SKILLS = "技能：泛用基準"
-_HEADERS = ("順序", "裝備", "等級", "DPS", "EHP", "評分")
+
+
+def _alternatives_text(step: PlanStep) -> str:
+    """`鬼索 -0.7%（接近）、海妖殺手 -7.5%（可考慮）`；無替代顯示「—」。"""
+    if not step.alternatives:
+        return "—"
+    return "、".join(
+        f"{a.item.name} {(a.score_ratio - 1) * 100:+.1f}%（{a.tier.value}）"
+        for a in step.alternatives
+    )
+_HEADERS = ("順序", "裝備", "等級", "DPS", "EHP", "評分", "替代選項")
 _BETA_STEP = 0.05
 
 
 class PlanPanel(QWidget):
     plan_requested = Signal(str, float)   # (target key, β)
     apply_requested = Signal()
+
+    COL_ALTERNATIVES = 6
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -64,7 +76,9 @@ class PlanPanel(QWidget):
         self._table.verticalHeader().setVisible(False)
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # 裝備名最長，吃剩餘寬度
+        # 替代選項是最長的一欄（三個「名稱 -x.x%（分級）」），讓它獨吃剩餘寬度；
+        # 裝備名短，依內容縮放即可。仍可能截斷，故每格附 tooltip 存全文。
+        header.setSectionResizeMode(self.COL_ALTERNATIVES, QHeaderView.ResizeMode.Stretch)
 
         self._skipped_label = QLabel("", self)
         self._skipped_label.setWordWrap(True)
@@ -143,9 +157,13 @@ class PlanPanel(QWidget):
                 f"{step.dps:.0f}",
                 f"{step.ehp:.0f}",
                 f"{step.score:.1f}",
+                _alternatives_text(step),
             )
             for column, text in enumerate(cells):
-                self._table.setItem(row, column, QTableWidgetItem(text))
+                cell = QTableWidgetItem(text)
+                if column == self.COL_ALTERNATIVES:
+                    cell.setToolTip(text)   # 欄寬不足時滑鼠停留看全文
+                self._table.setItem(row, column, cell)
         self._skipped_label.setText(
             "略過（非成品，不參與規劃）：" + "、".join(i.name for i in plan.skipped)
             if plan.skipped

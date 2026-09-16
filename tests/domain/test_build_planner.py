@@ -9,6 +9,7 @@ from itertools import permutations
 import pytest
 
 from lolcp.domain.build_planner import (
+    AlternativeTier,
     BuildPlanner,
     PlannerSettings,
     is_boots,
@@ -35,12 +36,13 @@ def planner() -> BuildPlanner:
 
 
 def settings(beta=0.0, boots_slot=0, beam_width=8, final=3000.0,
-             alternative_tolerance=0.03, max_alternatives=3) -> PlannerSettings:
+             near_tolerance=0.03, consider_tolerance=0.08, max_alternatives=3) -> PlannerSettings:
     # 窄 beam：玩具池多為同質件；boots_slot=0 時第 2 階段每集合窮舉 720 種排列
     return PlannerSettings(
         levels=LEVELS, final_holding_gold=final, beta=beta,
         boots_slot=boots_slot, beam_width=beam_width,
-        alternative_tolerance=alternative_tolerance, max_alternatives=max_alternatives,
+        near_tolerance=near_tolerance, consider_tolerance=consider_tolerance,
+        max_alternatives=max_alternatives,
     )
 
 
@@ -245,14 +247,22 @@ def test_search_matches_brute_force_on_a_small_pool():
 
 # ---- 接近的替代選項（spec 2026-09-16 near-tie §3、§6）----
 #
-# β=0、雙抗 0、基礎 AD 100、攻速 1.0 → 第 1 步分數 = 100 + 該件 AD。
-# AD 100／98／96／94／90 對應比例 1.00／0.99／0.98／0.97／0.95。
+# 比較基準是「換件後整條序列的價值」，不是單步分數 —— 單步分數會列出
+# 「這步更強、整體更差」的件並標成正值（真資料實測 +8.3%），語意錯誤。
+#
+# 玩具池：6 件 AD 100 入選（價格皆 3000、β=0、雙抗 0、基礎 AD 100、攻速 1.0）
+#   第 k 步分數 = 100 + 100k；V 有 6 項（第 1–5 步以下一件的價格加權、
+#   第 6 步以 final_holding_gold 加權，皆為 3000）
+#   V = 3000 × (200 + 300 + 400 + 500 + 600 + 700) = 8,100,000
+# 換入落選件後六步分數同減該件的 AD 差額 d：V' = V − 3000 × 6d
+#   d = 1 → −0.22%、d = 2 → −0.44%、d = 10 → −2.22%（皆在 3% 內 → 接近）
+#   d = 30 → −6.67%（超出 3%、仍在 8% 內 → 可考慮）
 
 def tie_pool():
-    strong = [item(i, 3000, ad(amount)) for i, amount in
-              ((1, 100.0), (2, 98.0), (3, 96.0), (4, 94.0), (5, 90.0))]
-    filler = [item(i, 3000, ad(10.0)) for i in range(6, 10)]
-    return strong + filler
+    chosen = [item(i, 3000, ad(100.0)) for i in range(1, 7)]
+    near = [item(7, 3000, ad(99.0)), item(8, 3000, ad(98.0)),
+            item(9, 3000, ad(90.0)), item(10, 3000, ad(70.0))]
+    return chosen + near
 
 
 def alt_ids(step):
@@ -262,25 +272,46 @@ def alt_ids(step):
 def test_alternatives_are_within_the_tolerance_and_sorted():
     plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [], settings())
     first = plan.steps[0]
-    assert first.item.item_id == 1
-    assert alt_ids(first) == [2, 3, 4]          # 0.99／0.98／0.97 入列，0.95 不入列
-    assert [round(a.score_ratio, 4) for a in first.alternatives] == [0.99, 0.98, 0.97]
+    assert alt_ids(first) == [7, 8, 9]          # 依比例排序；id 10（−6.67%）被數量上限截斷
+    assert [round(a.score_ratio, 4) for a in first.alternatives] == [0.9978, 0.9956, 0.9778]
+
+
+def test_alternatives_are_tiered_by_the_two_tolerances():
+    """3% 以內「接近」、8% 以內「可考慮」（spec 2026-09-16 near-tie §3）。"""
+    plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [], settings(max_alternatives=5))
+    tiers = [(a.item.item_id, a.tier) for a in plan.steps[0].alternatives]
+    assert tiers == [
+        (7, AlternativeTier.NEAR),       # −0.22%
+        (8, AlternativeTier.NEAR),       # −0.44%
+        (9, AlternativeTier.NEAR),       # −2.22%
+        (10, AlternativeTier.CONSIDER),  # −6.67% 超出 3%、仍在 8% 內
+    ]
 
 
 def test_tighter_tolerance_drops_the_further_ones():
-    plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [], settings(alternative_tolerance=0.02))
-    assert alt_ids(plan.steps[0]) == [2, 3]
+    plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [],
+                          settings(near_tolerance=0.01, consider_tolerance=0.01))
+    assert alt_ids(plan.steps[0]) == [7, 8]
 
 
 def test_alternatives_are_capped():
     plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [], settings(max_alternatives=1))
-    assert alt_ids(plan.steps[0]) == [2]
+    assert alt_ids(plan.steps[0]) == [7]
 
 
-def test_alternatives_never_include_the_chosen_item():
+def test_alternatives_never_exceed_the_chosen_plan():
+    """比例一律 ≤ 1：規劃結果本身就是最佳序列。"""
     plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [], settings())
     for step in plan.steps:
-        assert step.item.item_id not in alt_ids(step)
+        for alternative in step.alternatives:
+            assert alternative.score_ratio <= 1.0 + 1e-9
+
+
+def test_alternatives_never_include_items_already_in_the_plan():
+    plan = planner().plan(TOY_BASE, DUMMY, tie_pool(), [], settings())
+    chosen_ids = {s.item.item_id for s in plan.steps}
+    for step in plan.steps:
+        assert not chosen_ids & set(alt_ids(step))
 
 
 def test_alternatives_respect_group_caps_from_the_prefix():

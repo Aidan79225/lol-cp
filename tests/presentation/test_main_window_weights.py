@@ -212,6 +212,18 @@ def test_detail_panel_reports_passive_status(window):
     assert "被動：未建模" in w._detail._label.text()
 
 
+def test_plan_table_has_an_alternatives_column(window):
+    """真資料的替代清單留給 application 黃金測試；這裡只驗欄位接上了。"""
+    w, _, _ctx = window
+    select_champion(w, "達瑞文")
+    w._plan_panel._plan_button.click()
+    from lolcp.presentation.widgets.plan_panel import PlanPanel
+
+    cells = [w._plan_panel._table.item(r, PlanPanel.COL_ALTERNATIVES)
+             for r in range(w._plan_panel._table.rowCount())]
+    assert cells and all(c is not None and c.text() for c in cells)
+
+
 def test_plan_panel_boundary_counts_bound_passives(window):
     w, _, _ctx = window
     assert "已計入 22 件裝備被動" in w._plan_panel._boundary.text()

@@ -185,7 +185,7 @@ def load_kit_configs(directory: Path) -> dict[str, KitSettings]:
 
 _PLANNER_KEYS = (
     "levels", "final_holding_gold", "beta", "boots_slot", "beam_width",
-    "alternative_tolerance", "max_alternatives",
+    "near_tolerance", "consider_tolerance", "max_alternatives",
 )
 _MIN_LEVEL, _MAX_LEVEL = 1, 18
 
@@ -218,9 +218,17 @@ def load_planner_config(path: Path) -> PlannerSettings:
     beam_width = _required_int(raw, "beam_width")
     if beam_width < 1:
         raise ConfigError(f"beam_width 必須 ≥ 1，得到 {beam_width}")
-    tolerance = _required_number(raw, "alternative_tolerance", path.name)
-    if not 0.0 <= tolerance <= 1.0:
-        raise ConfigError(f"alternative_tolerance 必須在 0～1，得到 {tolerance}")
+    tolerances: dict[str, float] = {}
+    for name in ("near_tolerance", "consider_tolerance"):
+        value = _required_number(raw, name, path.name)
+        if not 0.0 <= value <= 1.0:
+            raise ConfigError(f"{name} 必須在 0～1，得到 {value}")
+        tolerances[name] = value
+    if tolerances["consider_tolerance"] < tolerances["near_tolerance"]:
+        raise ConfigError(
+            "consider_tolerance 必須 ≥ near_tolerance（較寬的一級），得到 "
+            f"{tolerances['consider_tolerance']} < {tolerances['near_tolerance']}"
+        )
     max_alternatives = _required_int(raw, "max_alternatives")
     if max_alternatives < 0:
         raise ConfigError(f"max_alternatives 必須 ≥ 0，得到 {max_alternatives}")
@@ -230,7 +238,8 @@ def load_planner_config(path: Path) -> PlannerSettings:
         beta=beta,
         boots_slot=boots_slot,
         beam_width=beam_width,
-        alternative_tolerance=tolerance,
+        near_tolerance=tolerances["near_tolerance"],
+        consider_tolerance=tolerances["consider_tolerance"],
         max_alternatives=max_alternatives,
     )
 

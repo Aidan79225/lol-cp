@@ -18,8 +18,11 @@ boots_slot = 2
 # beam search 保留的組合數。集合數 ≤ 此值時結果為全域最佳。
 beam_width = 40
 
-# 接近的替代選項（spec 2026-09-16 near-tie）：每一步列出分數差距在此比例內的
-# 其他合法候選。實測「第一件」常由 1% 以內的差距決定，遠小於模型誤差 ——
-# 列出替代是為了不把這種差距呈現成確定答案。0 = 不顯示。
-alternative_tolerance = 0.03
+# 替代選項（spec 2026-09-16 near-tie）：把某一步換成別件、其餘不動，
+# 整段序列價值仍在容忍範圍內者列出。兩級：
+#   near_tolerance     以內標「接近」（實測多落在第 4、6 步，差 1% 上下）
+#   consider_tolerance 以內標「可考慮」（第 1 步約 6–10%）
+# 以序列價值為基準，故比例一律 ≤ 1。max_alternatives = 0 即不顯示。
+near_tolerance = 0.03
+consider_tolerance = 0.08
 max_alternatives = 3
