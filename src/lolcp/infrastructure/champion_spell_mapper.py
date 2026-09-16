@@ -12,6 +12,8 @@ from lolcp.domain.spells import ChampionSpells, SpellData
 from lolcp.domain.stats import NORMALIZED_PRECISION
 from lolcp.infrastructure.formula_mapping import FormulaMapper
 
+CHARACTER_RECORD_TYPE = "CharacterRecord"
+
 
 class ChampionSpellMapper:
     def __init__(self, diagnostics: Diagnostics) -> None:
@@ -40,7 +42,22 @@ class ChampionSpellMapper:
                     ),
                 ),
             )
-        return ChampionSpells(key=key, spells=tuple(sorted(spells.items())))
+        return ChampionSpells(
+            key=key,
+            spells=tuple(sorted(spells.items())),
+            attack_speed_ratio=_attack_speed_ratio(raw_bin),
+        )
+
+
+def _attack_speed_ratio(raw_bin: dict) -> float | None:
+    """CharacterRecord.attackSpeedRatioModifiable（spec 2026-09-16 §3.1）。"""
+    for entry in raw_bin.values():
+        if not isinstance(entry, dict) or entry.get("__type") != CHARACTER_RECORD_TYPE:
+            continue
+        ratio = entry.get("attackSpeedRatioModifiable")
+        if isinstance(ratio, dict) and isinstance(ratio.get("baseValue"), (int, float)):
+            return round(float(ratio["baseValue"]), NORMALIZED_PRECISION)
+    return None
 
 
 def _numbers(raw: object) -> tuple[float, ...]:

@@ -131,10 +131,11 @@ def test_draven_q_empowers_attacks_by_the_assumed_ratio(spells, settings):
 
 
 def test_draven_w_attack_speed_scales_with_uptime(spells, settings):
-    """9 級 W2：Temp_AS[2] = 25%。"""
+    """9 級 W2：Temp_AS[2] = 25%，乘達瑞文攻速係數 0.679 → 1 + 0.25 × 0.679。"""
     full = model_for(bound(spells, settings, "Draven", w_uptime=1.0)).profile(TOY, 9, [])
     none = model_for(bound(spells, settings, "Draven", w_uptime=0.0)).profile(TOY, 9, [])
-    assert (full.attack_speed, none.attack_speed) == (pytest.approx(1.25), pytest.approx(1.0))
+    assert full.attack_speed == pytest.approx(1.0 + 0.25 * 0.679, abs=1e-4)
+    assert none.attack_speed == pytest.approx(1.0)
 
 
 def test_draven_window_damage_counts_e_and_both_r_passes(spells, settings):
@@ -170,7 +171,36 @@ def test_kayle_becomes_ranged_at_level_6(spells, settings, items):
 
 
 def test_kayle_passive_attack_speed_stacks_from_level_1(spells, settings):
-    assert model_for(bound(spells, settings, "Kayle")).profile(TOY, 1, []).attack_speed == pytest.approx(1.3)
+    """玩具基礎攻速 1.0 但凱爾係數 0.667 → 1 + 0.30 × 0.667。"""
+    profile = model_for(bound(spells, settings, "Kayle")).profile(TOY, 1, [])
+    assert profile.attack_speed == pytest.approx(1.0 + 0.30 * 0.667, abs=1e-3)
+
+
+REAL_KAYLE_AS = replace(TOY, attack_speed=0.625)
+PLUS_100_AS = Item(item_id=990002, name="玩具攻速", total_gold=3000, sell_gold=2100,
+                   stats=(StatLine(StatKey.ATTACK_SPEED, 100.0),), tags=(), icon="", recipe=())
+
+
+def test_kayle_attack_speed_uses_her_ratio_not_her_base(spells, settings):
+    """凱爾實值：0.625 + (100% 裝備 + 30% 被動) × 0.667 = 1.492（舊公式會得 1.4375）。"""
+    profile = model_for(bound(spells, settings, "Kayle")).profile(REAL_KAYLE_AS, 1, [PLUS_100_AS])
+    assert profile.attack_speed == pytest.approx(0.625 + 1.30 * 0.667, abs=1e-3)
+
+
+def test_champion_without_a_kit_keeps_the_old_formula(spells, settings):
+    """無技能模型的英雄係數 = 基礎攻速 —— 與舊公式完全等價。"""
+    plain = CombatModel(NO_SPELL, FIGHT, {}).profile(REAL_KAYLE_AS, 1, [PLUS_100_AS])
+    assert plain.attack_speed == pytest.approx(0.625 * (1 + 1.0))
+
+
+def test_draven_ratio_equals_his_base_attack_speed(spells, settings):
+    """達瑞文係數 0.679 = 他的基礎攻速 → 與舊公式 base × (1 + 加成) 等價。
+
+    要驗等價就必須用他真實的基礎攻速（玩具的 1.0 與係數不相稱）。"""
+    real_draven_as = replace(TOY, attack_speed=0.679)
+    kit = bound(spells, settings, "Draven", w_uptime=0.0, q_empowered_attack_ratio=0.0)
+    profile = model_for(kit).profile(real_draven_as, 1, [PLUS_100_AS])
+    assert profile.attack_speed == pytest.approx(0.679 * 2)
 
 
 def test_kayle_waves_start_at_level_11(spells, settings):
@@ -214,8 +244,10 @@ def test_samira_r_needs_the_combo_to_fit_the_window(spells, settings):
 
 
 def test_samira_e_attack_speed_weighted_by_uptime(spells, settings):
-    """E1 BonusAttackSpeed[1] = 0.2 × 持續率 (1 次 × 5 秒 ÷ 10) = +10%。"""
-    assert model_for(bound(spells, settings, "Samira")).profile(TOY, 6, []).attack_speed == pytest.approx(1.10)
+    """E1 BonusAttackSpeed[1] = 0.2 × 持續率 (1 次 × 5 秒 ÷ 10) = +10%，
+    乘煞蜜拉攻速係數 0.658 → 1 + 0.10 × 0.658。"""
+    profile = model_for(bound(spells, settings, "Samira")).profile(TOY, 6, [])
+    assert profile.attack_speed == pytest.approx(1.0 + 0.10 * 0.658, abs=1e-4)
 
 
 def test_samira_melee_passive_scales_with_the_melee_ratio(spells, settings):

@@ -3,6 +3,7 @@
 import pytest
 
 from lolcp.domain.combat import (
+    AS_CAP,
     CombatModel,
     SpellProxy,
     TargetProfile,
@@ -101,13 +102,15 @@ def test_effective_armor_never_goes_negative():
     assert aa_dps(profile, SQUISHY) == pytest.approx(naked_ad)  # 倍率封頂 1.0，不放大
 
 
-def test_attack_speed_items_scale_the_base_ratio_and_cap_at_2_5():
-    """裝備攻速是對基礎攻速的百分比加成；上限 2.5。"""
+def test_attack_speed_items_scale_the_base_ratio_and_cap():
+    """裝備攻速是對攻速係數的百分比加成（無 kit 時係數 = 基礎攻速）；
+    上限 3.003（維基：全單位唯一上限；舊值 2.5 是錯的，spec 2026-09-16 §3.2）。"""
     weapons = [item(1, 1000, StatLine(StatKey.ATTACK_SPEED, 50.0))]
     profile = model().profile(DRAVEN_BASE, 11, weapons)
     assert profile.attack_speed == pytest.approx(0.679 * (1 + 0.236925 + 0.5))
     silly = [item(1, 1000, StatLine(StatKey.ATTACK_SPEED, 900.0))]
-    assert model().profile(DRAVEN_BASE, 11, silly).attack_speed == 2.5
+    assert model().profile(DRAVEN_BASE, 11, silly).attack_speed == AS_CAP
+    assert AS_CAP == 3.003
 
 
 def test_ap_item_delta_is_only_its_scaling_share():

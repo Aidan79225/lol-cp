@@ -26,7 +26,8 @@ from lolcp.domain.skill_ranks import skill_ranks
 from lolcp.domain.spells import ChampionSpells, SpellData
 from lolcp.domain.stats import StatKey
 
-AS_CAP = 2.5
+# 官方維基：全單位攻速上限 3.003（1 秒 3.003 下）。舊值 2.5 是錯的（spec 2026-09-16 §3.2）。
+AS_CAP = 3.003
 BASE_CRIT_BONUS = 0.75   # 基礎暴擊傷害 175% → 額外 0.75；裝備暴傷疊加其上
 CRIT_CHANCE_CAP = 100.0
 
@@ -137,6 +138,8 @@ class StatSheet:
     base_ad: float
     bonus_ad: float
     ap: float
+    attack_speed_base: float    # 英雄基礎攻速
+    attack_speed_ratio: float   # 加成的乘數；無技能模型時 = 基礎攻速（等價舊公式）
     attack_speed_bonus: float   # ％：等級成長 + 裝備 + 被動 + 技能
     crit_chance: float
     crit_damage_bonus: float
@@ -149,6 +152,13 @@ class StatSheet:
     bonus_hp: float
     armor: float
     magic_resist: float
+
+    @property
+    def attack_speed(self) -> float:
+        """總攻速 = 基礎 + 加成% × 攻速係數（維基公式），封頂 AS_CAP。"""
+        return min(
+            AS_CAP, self.attack_speed_base + self.attack_speed_bonus / 100 * self.attack_speed_ratio
+        )
 
     def add_percent_penetration(self, armor: float = 0.0, magic: float = 0.0) -> None:
         """多個 % 穿透相乘疊加：(1−a)(1−b)。參數為比例（0.3 = 30%）。"""
@@ -345,11 +355,20 @@ class ItemEffect(Protocol):
     def apply(self, ctx: EffectContext) -> None: ...
 
 
+def _attack_speed_ratio(kit: ChampionKitView | None, base: ChampionBaseStats) -> float:
+    if kit is not None and kit.attack_speed_ratio is not None:
+        return kit.attack_speed_ratio
+    return base.attack_speed
+
+
 class ChampionKitView(Protocol):
     """已綁定的英雄技能模型（實作在 champion_kits.BoundKit）。"""
 
     @property
     def spells(self) -> ChampionSpells: ...
+
+    @property
+    def attack_speed_ratio(self) -> float | None: ...
 
     @property
     def settings(self) -> KitSettings: ...
@@ -399,10 +418,15 @@ class CombatModel:
             for line in it.stats:
                 totals[line.stat] = totals.get(line.stat, 0.0) + line.amount
         g = growth_factor(level)
+        kit = self._kit
         sheet = StatSheet(
             base_ad=base.attack_damage + base.attack_damage_growth * g,
             bonus_ad=totals.get(StatKey.AD, 0.0),
             ap=totals.get(StatKey.AP, 0.0),
+            attack_speed_base=base.attack_speed,
+            # 係數只有帶技能模型的英雄讀得到（僅這些英雄下載 bin）；
+            # 其餘以基礎攻速代入 —— 與舊公式 base × (1 + 加成) 完全等價。
+            attack_speed_ratio=_attack_speed_ratio(kit, base),
             attack_speed_bonus=base.attack_speed_growth * g + totals.get(StatKey.ATTACK_SPEED, 0.0),
             crit_chance=totals.get(StatKey.CRIT_CHANCE, 0.0),
             crit_damage_bonus=totals.get(StatKey.CRIT_DAMAGE, 0.0),
@@ -419,7 +443,6 @@ class CombatModel:
             + totals.get(StatKey.MAGIC_RESIST, 0.0),
         )
 
-        kit = self._kit
         # 遠近程先決定：裝備被動（破敗等）的數值依此切換；凱爾 6 級起靠被動變遠程。
         is_ranged = kit.is_ranged(level, base) if kit is not None else base.is_ranged
         modifiers = NO_MODIFIERS
@@ -445,10 +468,9 @@ class CombatModel:
                 )
             modifiers = AttackModifiers(**values)
 
-        attack_speed = base.attack_speed * (1 + sheet.attack_speed_bonus / 100)
         return CombatProfile(
             attack_damage=sheet.base_ad + sheet.bonus_ad,
-            attack_speed=min(AS_CAP, attack_speed),
+            attack_speed=sheet.attack_speed,
             crit_chance=min(CRIT_CHANCE_CAP, sheet.crit_chance),
             crit_damage_bonus=sheet.crit_damage_bonus,
             armor_pen_percent=sheet.armor_pen_percent,

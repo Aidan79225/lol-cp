@@ -67,6 +67,11 @@ class BoundKit:
     spells: ChampionSpells
     settings: KitSettings
 
+    @property
+    def attack_speed_ratio(self) -> float | None:
+        """裝備攻速加成的乘數（spec 2026-09-16 §3.1）；bin 無記錄時 None。"""
+        return self.spells.attack_speed_ratio
+
     def is_ranged(self, level: int, base: ChampionBaseStats) -> bool:
         if self.kit.ranged_from is None:
             return base.is_ranged

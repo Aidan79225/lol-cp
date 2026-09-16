@@ -54,6 +54,9 @@ class SpellData:
 class ChampionSpells:
     key: str
     spells: tuple[tuple[str, SpellData], ...]
+    # CharacterRecord 的攻速係數：裝備攻速加成乘的是它，不是基礎攻速
+    # （凱爾 0.667 ≠ 基礎 0.625）。缺記錄時為 None → 呼叫端退回基礎攻速。
+    attack_speed_ratio: float | None = None
 
     @cached_property
     def _by_name(self) -> dict[str, SpellData]:

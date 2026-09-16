@@ -65,6 +65,20 @@ def value(champions, key, spell_name, calc, rank, level=18, **stat_kw):
     )
 
 
+def test_attack_speed_ratio_comes_from_the_character_record(champions):
+    """裝備攻速加成乘的是攻速係數，不是基礎攻速（spec 2026-09-16 §3.1）。
+
+    實測：凱爾 0.667 ≠ 基礎攻速 0.625；達瑞文與煞蜜拉兩者相同。"""
+    assert champions["Kayle"].attack_speed_ratio == pytest.approx(0.667, abs=1e-3)
+    assert champions["Draven"].attack_speed_ratio == pytest.approx(0.679, abs=1e-3)
+
+
+def test_missing_character_record_yields_no_ratio():
+    mapper = ChampionSpellMapper(Diagnostics())
+    spells = mapper.map("Nobody", {"Characters/Nobody/Spells/X": {"mSpell": {}}})
+    assert spells.attack_speed_ratio is None
+
+
 def test_spells_are_indexed_by_short_name(champions):
     q = champions["Draven"].spell("DravenSpinning")
     assert q is not None and q.name == "DravenSpinning"
