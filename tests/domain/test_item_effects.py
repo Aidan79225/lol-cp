@@ -13,7 +13,13 @@ import pytest
 from lolcp.domain.combat import CombatModel, FightAssumptions, SpellProxy, TargetProfile
 from lolcp.domain.diagnostics import Diagnostics
 from lolcp.domain.entities import ChampionBaseStats
-from lolcp.domain.item_effects import EFFECTS, EffectCategory, ItemEffectBinder, passive_status
+from lolcp.domain.item_effects import (
+    EFFECTS,
+    EffectCategory,
+    ItemEffectBinder,
+    flurry_uptime,
+    passive_status,
+)
 from lolcp.infrastructure.mapping import ItemMapper
 from lolcp.infrastructure.repositories.file_item_repository import FileItemRepository
 
@@ -146,11 +152,50 @@ def test_overlords_converts_bonus_hp_to_ad(effects, items):
     assert model.attack_damage - plain.attack_damage == pytest.approx(0.025 * (plain.hp - RANGED.hp))
 
 
-def test_yun_tal_adds_stacked_crit_and_attack_speed(effects, items):
+def test_yun_tal_adds_stacked_crit(effects, items):
     plain = without_effects().profile(RANGED, 18, [items[3032]])
     model = with_effects(effects).profile(RANGED, 18, [items[3032]])
     assert model.crit_chance - plain.crit_chance == pytest.approx(25.0)
-    assert model.attack_speed - plain.attack_speed == pytest.approx(0.30)  # 基礎攻速 1.0 × 30%
+
+
+# ---- 雲陶狂箭 Flurry 持續率（spec 2026-09-16 §3.3）----
+
+def test_flurry_uptime_is_hand_computable():
+    """攻速 2.0、暴擊 50%：每秒減冷卻 2.0 × (1 + 0.5) = 3 秒 →
+    就緒 30 ÷ 4 = 7.5 秒 → 持續率 6 ÷ 7.5 = 0.8。"""
+    assert flurry_uptime(cooldown=30.0, duration=6.0, per_attack=1.0, per_crit=2.0,
+                         attack_speed=2.0, crit_chance=0.5) == pytest.approx(0.8)
+
+
+def test_flurry_uptime_caps_at_one():
+    assert flurry_uptime(cooldown=30.0, duration=6.0, per_attack=1.0, per_crit=2.0,
+                         attack_speed=10.0, crit_chance=1.0) == 1.0
+
+
+def test_flurry_uptime_without_attacks_is_duration_over_cooldown():
+    assert flurry_uptime(cooldown=30.0, duration=6.0, per_attack=1.0, per_crit=2.0,
+                         attack_speed=0.0, crit_chance=0.0) == pytest.approx(0.2)
+
+
+def test_yun_tal_attack_speed_is_weighted_by_flurry_uptime(effects, items):
+    """雲陶狂箭自身 45% 攻速、被動 25% 暴擊 → 估算攻速 1.45、暴擊 25%：
+    每秒減冷卻 1.45 × 1.25 = 1.8125 → 就緒 30 ÷ 2.8125 ≈ 10.67 →
+    持續率 ≈ 0.5625 → 攻速加成 30% × 0.5625 = 16.875 個百分點。"""
+    uptime = flurry_uptime(cooldown=30.0, duration=6.0, per_attack=1.0, per_crit=2.0,
+                           attack_speed=1.45, crit_chance=0.25)
+    profile = with_effects(effects).profile(RANGED, 18, [items[3032]])
+    assert profile.attack_speed == pytest.approx(1.45 + 0.30 * uptime)
+    assert uptime < 1.0  # 不再是常駐
+
+
+def test_yun_tal_unbinds_without_the_cooldown_values(items):
+    """四個數值全部讀自 bin —— 缺任一個即停用並留痕。"""
+    yun_tal = items[3032]
+    broken = replace(yun_tal, data_values=tuple(p for p in yun_tal.data_values if p[0] != "AACDR"))
+    diagnostics = Diagnostics()
+    bound = ItemEffectBinder(diagnostics).bind((broken,))
+    assert 3032 not in bound
+    assert diagnostics.unbound_item_effects == {3032: ("data value AACDR",)}
 
 
 def test_riftmaker_amplifies_all_damage(effects, items):

@@ -109,9 +109,42 @@ def _riftmaker(ctx: EffectContext) -> None:
     ctx.scale(damage_amp=1 + ctx.dv("EternityDamageIncreaseMax"))  # 視為疊滿
 
 
+def flurry_uptime(
+    *,
+    cooldown: float,
+    duration: float,
+    per_attack: float,
+    per_crit: float,
+    attack_speed: float,
+    crit_chance: float,
+) -> float:
+    """雲陶狂箭 Flurry 的持續率（spec 2026-09-16 §3.3）。
+
+    每次命中減 per_attack 秒、暴擊改減 per_crit 秒 → 每秒縮減
+    攻速 × (per_attack + 暴擊率 × (per_crit − per_attack))；
+    就緒時間 = 冷卻 ÷ (1 + 每秒縮減)；持續率 = 持續 ÷ max(持續, 就緒)。
+    """
+    per_second = attack_speed * (per_attack + crit_chance * (per_crit - per_attack))
+    ready_in = cooldown / (1 + per_second)
+    return min(1.0, duration / max(duration, ready_in))
+
+
 def _yun_tal(ctx: EffectContext) -> None:
+    """暴擊先加（Flurry 冷卻縮減吃暴擊），再以當下攻速估持續率，最後才加攻速。
+
+    近似：同階段的其他攻速（鬼索）與技能攻速（達瑞文 W 等，kit 在裝備之後）
+    尚未計入估算 —— 會略為低估持續率。
+    """
     ctx.stats.crit_chance += ctx.dv("CritMax")            # 百分點；視為疊滿
-    ctx.stats.attack_speed_bonus += ctx.dv("ASMod") * 100  # 比例；視為常駐
+    uptime = flurry_uptime(
+        cooldown=ctx.dv("Cooldown"),
+        duration=ctx.dv("ASDuration"),
+        per_attack=ctx.dv("AACDR"),
+        per_crit=ctx.dv("CritCDR"),
+        attack_speed=ctx.stats.attack_speed,
+        crit_chance=min(100.0, ctx.stats.crit_chance) / 100,
+    )
+    ctx.stats.attack_speed_bonus += ctx.dv("ASMod") * 100 * uptime
 
 
 def _rabadon(ctx: EffectContext) -> None:
@@ -226,8 +259,9 @@ EFFECTS: dict[int, ItemEffect] = {
                      data_values=("HPToADPercentage",)),
     4633: ItemEffect(EffectCategory.STAT_CONVERSION, STAGE_CONVERSION, _riftmaker,
                      data_values=("HealthToAPConversionPercent", "EternityDamageIncreaseMax")),
-    3032: ItemEffect(EffectCategory.STAT_CONVERSION, STAGE_CONVERSION, _yun_tal,
-                     data_values=("CritMax", "ASMod")),
+    # 傷害階段：Flurry 持續率要讀得到裝備提供的攻速（spec 2026-09-16 §3.3）
+    3032: ItemEffect(EffectCategory.STAT_CONVERSION, STAGE_DAMAGE, _yun_tal,
+                     data_values=("CritMax", "ASMod", "Cooldown", "ASDuration", "AACDR", "CritCDR")),
     3089: ItemEffect(EffectCategory.STAT_CONVERSION, STAGE_MULTIPLIER, _rabadon,
                      data_values=("APAmp",)),
     # 命中特效

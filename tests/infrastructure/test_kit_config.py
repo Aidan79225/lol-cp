@@ -26,7 +26,8 @@ def test_real_configs_load_with_skilled_player_defaults():
     kits = load_kit_configs(KITS_DIR)
     assert set(kits) == set(KIT_ASSUMPTIONS)
     assert kits["Draven"].skill_order == ("Q", "W", "E")
-    assert kits["Draven"].assumptions == {"q_empowered_attack_ratio": 1.0, "w_uptime": 1.0}
+    # 接斧比例預設 0.75：斧頭滯空時間固定，實戰約 70–80% 帶斧（spec 2026-09-16 §3.4）
+    assert kits["Draven"].assumptions == {"q_empowered_attack_ratio": 0.75, "w_uptime": 1.0}
     assert kits["Kayle"].skill_order == ("E", "Q", "W")
     assert kits["Kayle"].assumptions == {}
     assert kits["Samira"].skill_order == ("Q", "E", "W")

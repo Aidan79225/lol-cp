@@ -127,15 +127,18 @@ def plan_ids(use_case, key, target):
 
 
 def test_golden_draven_vs_squishy(use_case):
-    """雲陶狂箭 → 狂戰士護脛 → 臨界點 → 蒐集者 → 破堡者 → 無盡（含被動與技能）。
+    """雲陶狂箭 → 狂戰士護脛 → 臨界點 → 蒐集者 → 無盡 → 狂暴利刃（含被動與技能）。
 
     Q 強化普攻不吃暴擊也不是命中特效 —— 鬼索的倍增對達瑞文不划算，轉向暴擊＋穿甲。"""
-    assert plan_ids(use_case, "Draven", "squishy") == [3032, 3006, 3302, 6676, 2520, 3031]
+    assert plan_ids(use_case, "Draven", "squishy") == [3032, 3006, 3302, 6676, 3031, 3097]
 
 
-def test_golden_draven_vs_tank(use_case):
-    """雲陶狂箭 → 狂戰士護脛 → 多明尼克 → 破敗 → 鬼索 → 無盡。"""
-    assert plan_ids(use_case, "Draven", "tank") == [3032, 3006, 3036, 3153, 3124, 3031]
+def test_golden_draven_vs_tank_opens_with_botrk(use_case):
+    """破敗 → 狂戰士護脛 → 多明尼克 → 雲陶狂箭 → 鬼索 → 無盡。
+
+    雲陶狂箭的 Flurry 改為依冷卻實算（不再常駐）後，打坦克時它由第 1 件退到第 4 件，
+    開局讓給吃當前生命的破敗 —— 4000 血的目標讓現血傷害更值錢（spec 2026-09-16）。"""
+    assert plan_ids(use_case, "Draven", "tank") == [3153, 3006, 3036, 3032, 3124, 3031]
 
 
 def test_golden_kayle_vs_squishy_opens_with_guinsoo(use_case):
